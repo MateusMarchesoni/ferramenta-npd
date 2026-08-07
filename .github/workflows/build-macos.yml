@@ -39,6 +39,26 @@ jobs:
           pip install .
           pip install pyinstaller
 
+      # No Intel, o leitor de PDF quebrou com "Symbol not found:
+      # _SSL_get0_group_name": o `cryptography` (exigido pelo pdfminer) tinha
+      # sido ligado a um OpenSSL mais novo que o libssl que o PyInstaller
+      # empacotou. Este passo mostra contra o que cada coisa está ligada, para
+      # a correção ser dirigida e não chute.
+      - name: Diagnóstico do OpenSSL
+        run: |
+          echo "== cryptography =="
+          pip show cryptography | head -3
+          SO=$(python -c "import cryptography.hazmat.bindings._rust as m; print(m.__file__)")
+          echo "$SO"
+          otool -L "$SO" || true
+          echo "== _ssl do próprio Python =="
+          SSL=$(python -c "import _ssl; print(_ssl.__file__)")
+          otool -L "$SSL" || true
+          python -c "import ssl; print('OpenSSL do Python:', ssl.OPENSSL_VERSION)"
+          echo "== libssl visíveis na máquina =="
+          ls -l /usr/local/opt/openssl@3/lib/libssl*.dylib 2>/dev/null || true
+          ls -l /opt/homebrew/opt/openssl@3/lib/libssl*.dylib 2>/dev/null || true
+
       - name: Montar o executável
         run: pyinstaller --clean --noconfirm distribuir/npd-tool.spec
 
