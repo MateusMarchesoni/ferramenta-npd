@@ -1,0 +1,61 @@
+FERRAMENTA NPD
+==============
+
+Esta pasta e a ferramenta inteira. Nao precisa instalar nada.
+
+COMO ESTA ORGANIZADO
+--------------------
+
+  NPD.xlsx                    <- coloque a planilha NPD aqui
+  cotacoes\                   <- coloque aqui os arquivos de cotacao
+  1 - Abrir cotacoes          <- clique duplo, na ordem
+  2 - Conferir custo
+  3 - Gravar no funil
+  backups\                    (criado sozinho, a cada gravacao)
+  relatorios\                 (criado sozinho, a cada gravacao)
+  programa\                   (nao mexa)
+
+
+O QUE FAZER
+-----------
+
+  1. Copie a planilha NPD para esta pasta. So ela: se houver duas planilhas
+     aqui, a ferramenta nao sabe qual e a certa e vai avisar.
+
+  2. Copie os arquivos de cotacao para a pasta "cotacoes". Aceita .xlsx e
+     .pdf, quantos forem.
+
+  3. Clique duas vezes em "1 - Abrir cotacoes". Ele le as cotacoes e monta a
+     aba Candidatos dentro da planilha.
+
+  4. Abra a planilha, va na aba Candidatos, marque com x os produtos que quer
+     levar e preencha o NCM e a Marca de cada um. Salve e feche.
+
+  5. Clique em "2 - Conferir custo" e veja se os numeros fazem sentido.
+     Nada foi para o Funil ainda.
+
+  6. Clique em "3 - Gravar no funil". Pronto: os produtos entram no Funil e
+     na Priorizacao, com a foto dentro da celula.
+
+  7. Abra a Priorizacao e de as notas de 0 a 5. E isso que faz o score
+     existir - a ferramenta nao pontua produto, so prepara o terreno.
+
+
+SE ALGUMA COISA DER ERRADO
+--------------------------
+
+A janela preta sempre mostra o que aconteceu e o que fazer. Ela so fecha
+depois que voce aperta uma tecla, entao da tempo de ler.
+
+Toda gravacao faz um backup antes, na pasta "backups", com data e hora no
+nome. Para voltar atras, e so renomear o backup de volta para NPD.xlsx.
+
+O guia completo esta no arquivo COMO-USAR.md, nesta mesma pasta.
+
+
+IMPORTANTE
+----------
+
+Nao abra a planilha NPD com nenhum outro programa alem do Excel. Ela tem
+fotos dentro das celulas, comentarios e um grafico que nao sobrevivem a um
+"salvar como" feito por outro programa.

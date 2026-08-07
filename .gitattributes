@@ -1,0 +1,3 @@
+# Os .bat têm que chegar no Windows com CRLF, ou o cmd engasga.
+*.bat text eol=crlf
+*.command text eol=lf

@@ -1,0 +1,22 @@
+# Dados comerciais reais. As cotações dos fornecedores e a planilha NPD trazem
+# preço de compra, custo, margem e fornecedor — não vão para repositório
+# nenhum, nem privado. Sem elas a suíte não roda; o INSTALAR.md explica onde
+# colocá-las.
+tests/fixtures/
+saida/
+backups/
+relatorios/
+
+# build
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ambiente
+.venv/
+venv/
+
+.DS_Store

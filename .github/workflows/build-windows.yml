@@ -1,0 +1,70 @@
+# Monta o executável de Windows numa máquina Windows.
+#
+# Existe porque o PyInstaller não faz build cruzado: um .exe só sai de um
+# Windows. Como o desenvolvimento acontece num Mac, o GitHub empresta a máquina.
+#
+# O resultado é a pasta pronta para entregar: os três atalhos, o executável e
+# as pastas de trabalho. Baixa em Actions -> a execução -> Artifacts.
+name: Executável Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # permite rodar na mão, pelo botão do GitHub
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar a ferramenta e o PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Montar o executável
+        run: pyinstaller --clean --noconfirm distribuir/npd-tool.spec
+
+      - name: Conferir que o executável responde
+        run: dist\npd-tool.exe --help
+
+      # A prova que importa: sem planilha na pasta, a ferramenta tem que
+      # recusar com uma frase que diga o que fazer — é essa mensagem que a
+      # pessoa vê quando clica no atalho na pasta errada.
+      - name: Conferir a mensagem de pasta vazia
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path teste-vazio | Out-Null
+          Set-Location teste-vazio
+          $saida = & ..\dist\npd-tool.exe abrir 2>&1 | Out-String
+          Write-Host $saida
+          if ($saida -notmatch "Coloque a planilha NPD") {
+            throw "a mensagem de erro mudou — quem clicar no atalho vai ficar sem saber o que fazer"
+          }
+
+      - name: Montar a pasta de entrega
+        shell: pwsh
+        run: |
+          $pasta = "Ferramenta NPD"
+          New-Item -ItemType Directory -Force -Path "$pasta\programa" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$pasta\cotacoes" | Out-Null
+          Copy-Item dist\npd-tool.exe "$pasta\programa\"
+          Copy-Item "distribuir\windows\*.bat" "$pasta\"
+          Copy-Item COMO-USAR.md "$pasta\"
+          Copy-Item distribuir\LEIA-ME.txt "$pasta\" -ErrorAction SilentlyContinue
+          # a pasta de cotações precisa existir no zip, e zip não guarda pasta vazia
+          Set-Content -Path "$pasta\cotacoes\coloque aqui os arquivos de cotacao.txt" `
+            -Value "Copie para esta pasta os arquivos de cotacao (.xlsx ou .pdf) e depois clique em '1 - Abrir cotacoes'."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ferramenta-NPD-Windows
+          path: Ferramenta NPD/
+          if-no-files-found: error
