@@ -17,7 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-13 # Intel
+          # O label `macos-13` foi aposentado: o job fica na fila para sempre,
+          # sem runner e sem erro. `macos-15-intel` é o Intel que restou.
+          - runner: macos-15-intel
             arquitetura: Intel
           - runner: macos-latest # Apple Silicon
             arquitetura: Apple-Silicon
