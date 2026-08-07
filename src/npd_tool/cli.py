@@ -280,6 +280,49 @@ def comando_gravar(args) -> int:
     return 0
 
 
+def comando_versao(args=None) -> int:
+    """Versão e conferência de que os leitores de cotação carregam.
+
+    Existe por causa do executável: o PyInstaller monta o pacote a partir do
+    que consegue enxergar nos imports, e o pdfplumber carrega parte do pdfminer
+    por nome, em tempo de execução. Sem isto, o executável sai, roda com xlsx e
+    só quebra no primeiro PDF — na mão do gestor, meses depois. Aqui o erro
+    aparece na hora de montar.
+    """
+    from importlib import import_module
+
+    from npd_tool import __version__
+
+    empacotado = " (executável)" if getattr(sys, "frozen", False) else ""
+    print(f"npd-tool {__version__}{empacotado}")
+    print(f"python {sys.version.split()[0]}")
+
+    leitores = {
+        "cotação em xlsx": "npd_tool.ingest.xlsx_tabular",
+        "cotação transposta": "npd_tool.ingest.xlsx_transposto",
+        "ficha avulsa": "npd_tool.ingest.xlsx_ficha",
+        "cotação em PDF": "npd_tool.ingest.pdf_tabular",
+        "fotos": "npd_tool.ingest.imagens",
+        "escrita na planilha": "npd_tool.escrita.ooxml",
+    }
+    faltando = []
+    for rotulo, modulo in leitores.items():
+        try:
+            import_module(modulo)
+            print(f"  ok   {rotulo}")
+        except Exception as erro:
+            faltando.append(f"{rotulo} ({erro})")
+            print(f"  FALTA {rotulo}: {erro}")
+
+    if faltando:
+        print(
+            "\nesta cópia da ferramenta está incompleta e não deve ser usada.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="npd-tool",
@@ -315,6 +358,11 @@ def construir_parser() -> argparse.ArgumentParser:
         "gravar", help="lança os marcados no Funil e na Priorizacao"
     )
     gravar.set_defaults(funcao=comando_gravar)
+
+    versao = sub.add_parser(
+        "versao", help="mostra a versão e confere se a instalação está completa"
+    )
+    versao.set_defaults(funcao=comando_versao)
     return parser
 
 

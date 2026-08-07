@@ -35,19 +35,42 @@ jobs:
       - name: Conferir que o executável responde
         run: dist\npd-tool.exe --help
 
-      # A prova que importa: sem planilha na pasta, a ferramenta tem que
+      # O empacotamento é o passo que falha em silêncio: o PyInstaller pode
+      # deixar de fora o pdfminer, que o pdfplumber carrega por nome. O
+      # executável sai, roda com xlsx e só quebra no primeiro PDF — na mão do
+      # gestor, meses depois. `versao` importa cada leitor e sai com erro se
+      # faltar algum.
+      - name: Conferir que todos os leitores foram empacotados
+        run: dist\npd-tool.exe versao
+
+      # A outra prova que importa: sem planilha na pasta, a ferramenta tem que
       # recusar com uma frase que diga o que fazer — é essa mensagem que a
       # pessoa vê quando clica no atalho na pasta errada.
       - name: Conferir a mensagem de pasta vazia
         shell: pwsh
         run: |
+          # O pwsh do Actions roda com ErrorActionPreference=Stop, e aí qualquer
+          # linha em stderr de um programa externo vira erro fatal. Aqui stderr
+          # é a saída esperada, não uma falha.
+          $ErrorActionPreference = 'Continue'
+          $PSNativeCommandUseErrorActionPreference = $false
+
           New-Item -ItemType Directory -Force -Path teste-vazio | Out-Null
           Set-Location teste-vazio
-          $saida = & ..\dist\npd-tool.exe abrir 2>&1 | Out-String
+          $saida = & ..\dist\npd-tool.exe abrir *>&1 | Out-String
+          $codigo = $LASTEXITCODE
           Write-Host $saida
+          Write-Host "código de saída: $codigo"
+
           if ($saida -notmatch "Coloque a planilha NPD") {
-            throw "a mensagem de erro mudou — quem clicar no atalho vai ficar sem saber o que fazer"
+            Write-Host "::error::a mensagem mudou — quem clicar no atalho na pasta errada fica sem saber o que fazer"
+            exit 1
           }
+          if ($codigo -ne 2) {
+            Write-Host "::error::esperava código 2 (recusa com motivo), veio $codigo"
+            exit 1
+          }
+          exit 0
 
       - name: Montar a pasta de entrega
         shell: pwsh

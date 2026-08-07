@@ -384,16 +384,91 @@ def test_cotacao_que_saiu_do_lugar_para_com_mensagem(planilha, tmp_path):
     assert "não está mais onde estava" in str(erro.value)
 
 
-def test_sem_planilha_informada_o_comando_recusa(capsys):
+def test_pasta_sem_planilha_diz_o_que_fazer(tmp_path, capsys):
+    """Quem clica num atalho na pasta errada não tem terminal para investigar:
+    a mensagem é a única coisa entre ela e desistir."""
     import os
 
     anterior = os.environ.pop("NPD_PLANILHA", None)
     try:
-        assert main(["abrir", str(FRESPRO)]) == 2
-        assert "informe a planilha" in capsys.readouterr().err
+        assert main(["--pasta", str(tmp_path), "abrir", str(FRESPRO)]) == 2
+        erro = capsys.readouterr().err
+        assert "não achei nenhuma planilha" in erro
+        assert "Coloque a planilha NPD nessa pasta" in erro
     finally:
         if anterior:
             os.environ["NPD_PLANILHA"] = anterior
+
+
+def test_pasta_com_duas_planilhas_pede_desempate(tmp_path, capsys):
+    import os
+    import shutil as sh
+
+    anterior = os.environ.pop("NPD_PLANILHA", None)
+    try:
+        sh.copy(NPD, tmp_path / "NPD.xlsx")
+        sh.copy(NPD, tmp_path / "outra planilha.xlsx")
+        assert main(["--pasta", str(tmp_path), "abrir", str(FRESPRO)]) == 2
+        erro = capsys.readouterr().err
+        assert "mais de uma planilha" in erro
+        assert "outra planilha.xlsx" in erro
+    finally:
+        if anterior:
+            os.environ["NPD_PLANILHA"] = anterior
+
+
+def test_modo_pasta_acha_a_planilha_e_as_cotacoes_sozinho(tmp_path):
+    """O modo que os atalhos clicáveis usam: nenhum caminho digitado."""
+    import os
+    import shutil as sh
+
+    from npd_tool.custo.parametros import ParametrosCusto
+    from npd_tool.escrita.ooxml import escrever_parametros_custo
+
+    anterior = os.environ.pop("NPD_PLANILHA", None)
+    try:
+        planilha = tmp_path / "NPD.xlsx"
+        escrever_parametros_custo(NPD, planilha, ParametrosCusto.padrao(), TabelaNCM())
+        cotacoes = tmp_path / "cotações"
+        cotacoes.mkdir()
+        sh.copy(FRESPRO, cotacoes / FRESPRO.name)
+
+        assert main(["--pasta", str(tmp_path), "abrir"]) == 0
+
+        wb = openpyxl.load_workbook(planilha)
+        try:
+            assert NOME_ABA in wb.sheetnames
+            assert wb[NOME_ABA][f"D{PRIMEIRA_LINHA}"].value == "FD-52A"
+        finally:
+            wb.close()
+    finally:
+        if anterior:
+            os.environ["NPD_PLANILHA"] = anterior
+
+
+def test_arquivo_de_bloqueio_do_excel_nao_conta_como_planilha(tmp_path):
+    """Com a planilha aberta, o Excel cria um `~$NPD.xlsx` ao lado. Ele é uma
+    planilha para o glob e lixo para nós — se contasse, a ferramenta acharia
+    duas e recusaria trabalhar justamente quando o arquivo está aberto."""
+    import shutil as sh
+
+    from npd_tool.cli import _planilhas_na_pasta
+
+    sh.copy(NPD, tmp_path / "NPD.xlsx")
+    (tmp_path / "~$NPD.xlsx").write_bytes(b"lixo do Excel")
+
+    assert [p.name for p in _planilhas_na_pasta(tmp_path)] == ["NPD.xlsx"]
+
+
+def test_versao_confere_que_os_leitores_carregam(capsys):
+    """No executável do PyInstaller esta é a diferença entre descobrir que o
+    leitor de PDF ficou de fora agora ou meses depois, na mão do gestor."""
+    from npd_tool.cli import comando_versao
+
+    assert comando_versao() == 0
+    saida = capsys.readouterr().out
+    assert "cotação em PDF" in saida
+    assert "FALTA" not in saida
 
 
 def test_conferir_sem_aba_candidatos_explica_o_que_fazer(planilha, capsys):

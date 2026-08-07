@@ -9,30 +9,52 @@ de 0 a 5 continuam sendo suas.
 
 ---
 
-## O ciclo, em três comandos
+## Se você recebeu a pasta pronta (clicando)
+
+Você não digita nada. A pasta é assim:
 
 ```
-npd-tool abrir  <arquivos de cotação>     lista os produtos numa aba nova
+Ferramenta NPD/
+├── NPD.xlsx                    <- a planilha, só ela
+├── cotações/                   <- jogue os arquivos de cotação aqui
+├── 1 - Abrir cotações          <- clique duplo, nesta ordem
+├── 2 - Conferir custo
+└── 3 - Gravar no funil
+```
+
+Copie as cotações para a pasta `cotações`, clique no **1**, escolha os produtos
+na planilha, clique no **2**, confira, clique no **3**. Os passos abaixo
+explicam o que acontece em cada um.
+
+A janela preta que abre mostra o que aconteceu e só fecha quando você aperta
+uma tecla — dá tempo de ler.
+
+## Se você usa o terminal
+
+```
+npd-tool abrir  [arquivos de cotação]     lista os produtos numa aba nova
 npd-tool conferir                          calcula o custo do que você marcou
 npd-tool gravar                            lança no Funil e na Priorizacao
+npd-tool versao                            confere se a instalação está inteira
 ```
 
-Antes de qualquer coisa, diga onde está a planilha:
+Sem argumento nenhum, a ferramenta procura a planilha e as cotações na pasta
+em que você está. Para apontar outro lugar:
 
 ```
-export NPD_PLANILHA="/caminho/para/NPD_2026_04_08_26.xlsx"
+npd-tool --npd /caminho/NPD.xlsx abrir /caminho/cotacao.pdf
+export NPD_PLANILHA="/caminho/NPD.xlsx"     # Windows: set NPD_PLANILHA=...
 ```
 
-(no Windows: `set NPD_PLANILHA=C:\caminho\para\NPD.xlsx`)
-
-Ou passe em cada comando: `npd-tool --npd caminho/NPD.xlsx abrir ...`
-
-Não existe caminho padrão de propósito. Um default apontando para a planilha
-de verdade é um Enter distraído de distância de escrever no arquivo errado.
+Não existe caminho padrão fixo, de propósito. Um default apontando para a
+planilha de verdade é um Enter distraído de distância de escrever no arquivo
+errado.
 
 ---
 
 ## Passo 1 — abrir a cotação
+
+Clique em **1 - Abrir cotações**, ou:
 
 ```
 npd-tool abrir "Quotation Jiabao.pdf" "Frespro.xlsx"
@@ -87,9 +109,7 @@ multa, não só número errado.
 
 ## Passo 3 — conferir o custo
 
-```
-npd-tool conferir
-```
+Clique em **2 - Conferir custo**, ou `npd-tool conferir`.
 
 O custo estimado aparece na **coluna M** da aba `Candidatos`, e no terminal
 com as pendências de cada produto:
@@ -104,9 +124,7 @@ ou o nome na aba e rode `conferir` de novo — o que você marcou não se perde.
 
 ## Passo 4 — gravar
 
-```
-npd-tool gravar
-```
+Clique em **3 - Gravar no funil**, ou `npd-tool gravar`.
 
 Cada produto entra em **duas** abas ao mesmo tempo: uma linha no `Funil` e a
 linha correspondente na `Priorizacao`. As duas precisam existir, porque o
