@@ -36,6 +36,23 @@ jobs:
       - name: Instalar a ferramenta e o PyInstaller
         run: |
           python -m pip install --upgrade pip
+
+          # O `cryptography` (exigido pelo pdfminer, que o pdfplumber usa) não
+          # publica mais wheel para macOS Intel. Sem isto o pip compila do
+          # fonte e amarra o binário ao OpenSSL do Homebrew, em
+          # /usr/local/opt/openssl@3 — que é mais novo que o libssl que vem
+          # junto com o Python. Os dois arquivos se chamam `libssl.3.dylib`, e
+          # como só um cabe na raiz do pacote, o PyInstaller mantém o do Python
+          # e religa o cryptography nele. Aí falta o símbolo
+          # `_SSL_get0_group_name` e o leitor de PDF morre — só no Intel, e só
+          # no executável, nunca em desenvolvimento.
+          #
+          # Exigir wheel faz o pip recuar até a versão mais nova que ainda tem
+          # uma, e essas trazem o OpenSSL embutido: some a colisão e some a
+          # dependência de um caminho do Homebrew que não existe na máquina de
+          # quem recebe.
+          pip install --only-binary=:all: cryptography
+
           pip install .
           pip install pyinstaller
 
