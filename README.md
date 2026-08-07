@@ -25,8 +25,19 @@ npd-tool gravar                 lança no Funil e na Priorizacao
 ```
 
 Ou, sem digitar nada: os arquivos de cotação vão para a pasta `cotações/` e a
-pessoa clica nos três atalhos, na ordem. O executável de Windows sai pronto
-em **Actions → Executável Windows → Artifacts**.
+pessoa clica nos três atalhos, na ordem.
+
+Pacotes prontos, sem instalar Python, em [Releases](../../releases) — e a cada
+push em **Actions → Artifacts**:
+
+| Sistema | Pacote |
+|---|---|
+| Windows | `Ferramenta-NPD-Windows` |
+| Mac com chip M1/M2/M3… | `Ferramenta-NPD-Mac-Apple-Silicon` |
+| Mac com processador Intel | `Ferramenta-NPD-Mac-Intel` |
+
+O processador do Mac aparece em *menu Apple → Sobre este Mac*. O binário de
+Apple Silicon não roda em Mac Intel.
 
 ## O que ela nunca faz
 

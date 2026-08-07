@@ -46,15 +46,31 @@ pyinstaller --onefile --name npd-tool src/npd_tool/__main__.py
 # sai em dist/npd-tool (ou dist\npd-tool.exe no Windows)
 ```
 
-**A pegadinha que custa uma tarde:** o PyInstaller não faz build cruzado. Um
-`.exe` de Windows só sai de uma máquina Windows; um executável de Mac, de um
-Mac. Se o gestor usa Windows e você usa Mac, as saídas são: uma máquina virtual
-Windows, um PC emprestado, ou o GitHub Actions montando o `.exe` a cada versão.
+**O PyInstaller não faz build cruzado**, e é por isso que os builds moram no
+GitHub Actions: um `.exe` só sai de uma máquina Windows, e um executável de Mac,
+de um Mac. Os dois workflows já estão prontos e rodam a cada push para `main`:
 
-No Mac ainda há a assinatura: um executável baixado sem assinar cai na
-quarentena do Gatekeeper e o macOS diz que "não pode ser verificado". Resolve
-com clique direito → Abrir na primeira vez, ou pagando a conta de desenvolvedor
-da Apple.
+| Workflow | Sai | Onde |
+|---|---|---|
+| `Executável Windows` | `.exe` x86-64 | Actions → Artifacts |
+| `Executável Mac` | um para Intel, um para Apple Silicon | Actions → Artifacts |
+
+**No Mac, processador importa.** Um binário de Apple Silicon **não roda** em
+Mac Intel — não existe Rosetta nessa direção. O `universal2` do PyInstaller
+resolveria, mas exige wheel universal de todas as bibliotecas, e o pdfminer e
+companhia não têm. Por isso saem dois pacotes; quem entrega escolhe pelo
+*menu Apple → Sobre este Mac* da pessoa (diz "Chip M…" ou "Processador Intel").
+
+**Assinatura, nos dois sistemas.** Nada aqui é assinado, então:
+
+- No Windows, o SmartScreen mostra "O Windows protegeu o computador" na
+  primeira execução → *Mais informações → Executar assim mesmo*.
+- No Mac, o Gatekeeper diz que não pode verificar o programa → clique direito
+  → Abrir, ou `xattr -dr com.apple.quarantine <pasta>` para liberar de uma vez.
+
+Isso só some pagando a conta de desenvolvedor da Apple e um certificado de
+assinatura no Windows. Para uma ferramenta interna usada por uma pessoa, não
+compensa — mas **avise antes de entregar**, ou a pessoa vai achar que é vírus.
 
 ### Nível 3 — sem terminal nenhum (o que eu faria)
 

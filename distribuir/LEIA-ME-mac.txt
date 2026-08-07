@@ -1,0 +1,88 @@
+FERRAMENTA NPD — Mac
+====================
+
+Esta pasta é a ferramenta inteira. Não precisa instalar nada.
+
+
+ANTES DE TUDO: A PRIMEIRA EXECUÇÃO
+----------------------------------
+
+O macOS bloqueia programas que não foram assinados com a conta de
+desenvolvedor da Apple — e este não foi. Na primeira vez você vai ver algo
+como "não foi possível verificar se contém software malicioso".
+
+Isso é esperado. Para liberar, escolha um dos dois caminhos:
+
+  Caminho A (mais simples)
+    1. Clique com o botão direito em "1 - Abrir cotações"
+    2. Escolha "Abrir"
+    3. Na caixa que aparecer, clique em "Abrir" de novo
+    Depois disso ele abre normal, com clique duplo. Repita para os outros
+    dois atalhos na primeira vez de cada um.
+
+  Caminho B (libera tudo de uma vez)
+    1. Abra o aplicativo Terminal
+    2. Escreva  xattr -dr com.apple.quarantine   (com um espaço no fim)
+    3. Arraste esta pasta para dentro da janela do Terminal
+    4. Aperte Enter
+
+Se os atalhos vierem por pen drive em vez de download, esse bloqueio
+normalmente nem aparece.
+
+
+COMO ESTÁ ORGANIZADO
+--------------------
+
+  NPD.xlsx                    <- coloque a planilha NPD aqui
+  cotações/                   <- coloque aqui os arquivos de cotação
+  1 - Abrir cotações          <- clique duplo, nesta ordem
+  2 - Conferir custo
+  3 - Gravar no funil
+  backups/                    (criado sozinho, a cada gravação)
+  relatorios/                 (criado sozinho, a cada gravação)
+  programa/                   (não mexa)
+
+
+O QUE FAZER
+-----------
+
+  1. Copie a planilha NPD para esta pasta. Só ela: se houver duas planilhas
+     aqui, a ferramenta não sabe qual é a certa e vai avisar.
+
+  2. Copie os arquivos de cotação para a pasta "cotações". Aceita .xlsx e
+     .pdf, quantos forem.
+
+  3. Clique duas vezes em "1 - Abrir cotações". Ele lê as cotações e monta a
+     aba Candidatos dentro da planilha.
+
+  4. Abra a planilha, vá na aba Candidatos, marque com x os produtos que quer
+     levar e preencha o NCM e a Marca de cada um. Salve e feche.
+
+  5. Clique em "2 - Conferir custo" e veja se os números fazem sentido.
+     Nada foi para o Funil ainda.
+
+  6. Clique em "3 - Gravar no funil". Pronto: os produtos entram no Funil e
+     na Priorizacao, com a foto dentro da célula.
+
+  7. Abra a Priorizacao e dê as notas de 0 a 5. É isso que faz o score
+     existir — a ferramenta não pontua produto, só prepara o terreno.
+
+
+SE ALGUMA COISA DER ERRADO
+--------------------------
+
+A janela do Terminal que abre mostra o que aconteceu e o que fazer. Ela só
+fecha depois que você aperta uma tecla, então dá tempo de ler.
+
+Toda gravação faz um backup antes, na pasta "backups", com data e hora no
+nome. Para voltar atrás, é só renomear o backup de volta para NPD.xlsx.
+
+O guia completo está no arquivo COMO-USAR.md, nesta mesma pasta.
+
+
+IMPORTANTE
+----------
+
+Não abra a planilha NPD com nenhum outro programa além do Excel. Nem com o
+Numbers. Ela tem fotos dentro das células, comentários e um gráfico que não
+sobrevivem a um "salvar como" feito por outro programa.
