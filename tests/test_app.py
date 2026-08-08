@@ -291,3 +291,26 @@ def test_lembra_a_ultima_planilha_e_esquece_a_que_sumiu(tmp_path, planilha):
 
     planilha.unlink()
     assert config.ultima_planilha() is None, "ofereceu uma planilha que não existe mais"
+
+
+# ------------------------------------------------------- seletor de arquivos
+
+def test_o_filtro_de_tipos_e_aceito_pelo_proprio_pywebview():
+    """O separador do filtro é ponto e vírgula, não espaço.
+
+    Com espaço, o `pywebview` recusa a chamada com `ValueError: ... is not a
+    valid file filter` — e não no build, nem ao abrir o programa: no clique de
+    "Adicionar cotações". Foi assim que chegou na mão de quem usa.
+
+    Quem valida aqui é o próprio `pywebview`. Repetir a expressão regular dele
+    neste teste seria a mesma pessoa conferindo a própria conta duas vezes.
+    """
+    webview_util = pytest.importorskip("webview.util")
+
+    from npd_tool.app import dialogos
+
+    for extensoes in (("xlsx",), dialogos.EXTENSOES_COTACAO):
+        filtro = dialogos.filtro_do_webview(extensoes)
+        descricao, padroes = webview_util.parse_file_type(filtro)
+        assert descricao
+        assert padroes == ";".join(f"*.{e}" for e in extensoes)

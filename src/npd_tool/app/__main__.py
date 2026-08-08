@@ -68,6 +68,26 @@ def conferir_instalacao(escrever) -> int:
     except Exception as erro:
         # não é falha: sem `webview` a tela abre no navegador padrão
         escrever(f"  aviso janela nativa indisponível ({erro}) — a tela abre no navegador")
+    else:
+        # O filtro de tipos do seletor só é validado quando a pessoa clica em
+        # "Adicionar cotações" — segundo passo do trabalho, com o programa já
+        # instalado. Um separador errado ali passou por toda a montagem, por
+        # todos os testes e chegou na mão de quem usa. Aqui custa milissegundos.
+        from webview.util import parse_file_type
+
+        from npd_tool.app import dialogos
+
+        for rotulo, extensoes in (
+            ("planilha", ("xlsx",)),
+            ("cotações", dialogos.EXTENSOES_COTACAO),
+        ):
+            filtro = dialogos.filtro_do_webview(extensoes)
+            try:
+                parse_file_type(filtro)
+                escrever(f"  ok    filtro do seletor de {rotulo}")
+            except ValueError as erro:
+                falhas.append(f"filtro do seletor de {rotulo}: {erro}")
+                escrever(f"  FALHA filtro do seletor de {rotulo}: {erro}")
 
     from npd_tool.app import servidor
 

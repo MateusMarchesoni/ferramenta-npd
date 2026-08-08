@@ -39,6 +39,24 @@ class SemSeletor(Exception):
 
 # --------------------------------------------------------------- janela nativa
 
+def filtro_do_webview(extensoes) -> str:
+    """O filtro de tipos no formato exato que o `pywebview` exige.
+
+        Cotações e planilhas (*.xlsx;*.xls;*.pdf)
+
+    O separador é **ponto e vírgula**. Com espaço, o `pywebview` recusa a
+    chamada inteira com `ValueError: ... is not a valid file filter` — e o erro
+    não aparece ao montar o pacote nem ao abrir o programa: aparece no clique
+    de "Adicionar cotações", que é o segundo passo do trabalho de quem usa.
+
+    Está numa função só para o teste poder passar o resultado pelo validador do
+    próprio `pywebview`, em vez de conferir o formato de novo por conta e errar
+    junto.
+    """
+    padroes = ";".join(f"*.{extensao}" for extensao in extensoes)
+    return f"Cotações e planilhas ({padroes})"
+
+
 def _pelo_webview(pasta_inicial: Path | None, multiplos: bool, tipos, salvar_pasta):
     import webview
 
@@ -192,8 +210,7 @@ def escolher(
     if janela_ativa is not None:
         tipos = ()
         if extensoes:
-            padroes = " ".join(f"*.{ext}" for ext in extensoes)
-            tipos = (f"Cotações e planilhas ({padroes})",)
+            tipos = (filtro_do_webview(extensoes),)
         return _pelo_webview(pasta_inicial, multiplos, tipos, escolher_pasta)
 
     if sys.platform == "darwin":
