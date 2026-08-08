@@ -152,9 +152,72 @@ ROTULOS_CONHECIDOS = frozenset(PAPEL_POR_ROTULO)
 PAPEIS_DE_IDENTIDADE = frozenset({"modelo", "nome"})
 
 
+_RE_TOKEN = re.compile(r"[0-9a-zà-öø-ÿ]+")
+
+
+def _tokens(rotulo_normalizado: str) -> set:
+    return set(_RE_TOKEN.findall(rotulo_normalizado))
+
+
+def _tem(t: set, *palavras: str) -> bool:
+    return any(p in t for p in palavras)
+
+
+# Segunda camada, por palavra-chave. A lista de variantes acima é exata e
+# sempre vai ficar para trás: `Unit Price (USD) FOB` é preço para qualquer
+# leitor humano e não casa com "unit price" nem com "fob price".
+#
+# Cada regra abaixo é deliberadamente estreita, porque o custo de errar não é
+# simétrico. Reparar num rótulo a mais custa uma coluna lida torto, que a
+# pessoa vê na tela; **confundir dimensão de produto ou caixa de presente com
+# a caixa de embarque produz um m³ errado**, que ninguém vê e que entra
+# calado no rateio de frete e na base de todos os tributos (PLANO.md 6.4).
+# Por isso `Item sizes` e `Gift box sizes` continuam sem papel: só `carton` e
+# `packing` viram embalagem.
+#
+# Pelo mesmo motivo `item` sozinho não é modelo — nesta mesma cotação existe
+# uma coluna `Item sizes`, que viraria a identidade do produto.
+REGRAS_APROXIMADAS = (
+    ("pcs_por_caixa", lambda t: _tem(t, "pcs", "pçs", "pecas", "peças")
+     and _tem(t, "ctn", "carton", "cx", "caixa")),
+    ("preco", lambda t: _tem(t, "price", "preco", "preço", "quotation")),
+    ("moq", lambda t: "moq" in t),
+    ("cbm", lambda t: _tem(t, "cbm", "m3", "m³")),
+    ("modelo", lambda t: _tem(t, "model", "modelo")
+     or (_tem(t, "item", "art", "article", "produto", "product")
+         and _tem(t, "no", "number", "code", "codigo", "código", "ref"))),
+    ("descricao", lambda t: _tem(t, "description", "descricao", "descrição")),
+    ("embalagem", lambda t: _tem(t, "carton", "packing", "embalagem")),
+    ("certificado", lambda t: _tem(t, "certificate", "certification",
+                                   "certificado", "certificação")),
+    ("foto", lambda t: _tem(t, "photo", "picture", "image", "foto", "imagem")),
+    # `min` sozinho é ambíguo (existe "min price"), mas acompanhado de pedido
+    # ou quantidade só pode ser MOQ — e `Min. Order Qty` é como metade das
+    # cotações escreve
+    ("moq", lambda t: _tem(t, "minimum", "min", "minimo", "mínimo")
+     and _tem(t, "order", "quantity", "qty", "pedido", "quantidade")),
+)
+
+
 def papel_de(valor) -> str | None:
-    """O papel de um rótulo de cabeçalho, ou `None` se não for conhecido."""
-    return PAPEL_POR_ROTULO.get(normalizar(valor))
+    """O papel de um rótulo de cabeçalho, ou `None` se não for conhecido.
+
+    Casamento exato primeiro; só depois as regras por palavra-chave. A ordem
+    importa: o exato é o que distingue rótulos parecidos entre si, e deixá-lo
+    perder para uma regra ampla trocaria acertos por quase-acertos.
+    """
+    normalizado = normalizar(valor)
+    if not normalizado:
+        return None
+    exato = PAPEL_POR_ROTULO.get(normalizado)
+    if exato is not None:
+        return exato
+
+    tokens = _tokens(normalizado)
+    for papel, regra in REGRAS_APROXIMADAS:
+        if regra(tokens):
+            return papel
+    return None
 
 
 def e_rotulo(valor) -> bool:

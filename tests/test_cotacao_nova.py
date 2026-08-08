@@ -24,6 +24,7 @@ from npd_tool.ingest.xlsx_generico import para_preco
 
 FIXTURES = Path(__file__).parent / "fixtures"
 NPD = FIXTURES / "NPD_2026_04_08_26.xlsx"
+KHC = FIXTURES / "KHC quotation 2.pdf"
 
 
 def _planilha(tmp_path, nome, linhas, titulo_aba="Sheet1"):
@@ -175,6 +176,50 @@ def test_planilha_sem_tabela_alguma_diz_o_que_procurar(tmp_path):
     # a mensagem precisa dizer o que a ferramenta procurou, senão não há o que
     # a pessoa possa corrigir no arquivo
     assert "cabeçalho" in str(erro.value)
+
+
+def test_pdf_khc_cabecalho_que_a_lista_exata_nao_alcanca():
+    """Cotação real de fornecedor novo, a que motivou a camada por palavra-chave.
+
+    O cabeçalho é `Unit Price (USD) FOB` — preço para qualquer leitor humano, e
+    fora da lista exata, que tinha `unit price` e `fob price` separados. Sem
+    achar a coluna de preço, `_ler_cabecalho` descartava a tabela inteira e o
+    PDF virava "não encontrei nenhuma tabela de produtos".
+
+    O arquivo também exercita as três armadilhas de m³ na mesma linha:
+    `Item sizes`, `Gife box sizes` e `Carton sizes` lado a lado. Só a última
+    pode virar volume de embarque.
+    """
+    fichas = ler_cotacao(KHC)
+
+    assert [f.modelo for f in fichas] == ["HS-BR01", "ELS02", "ELS03", "ELS03S"]
+    assert [f.precos[0].valor for f in fichas] == [
+        Decimal("25"),
+        Decimal("40.00"),
+        Decimal("48.00"),
+        Decimal("60.00"),
+    ]
+    # o carton é 435*375*340, não o item (165*16*150) nem a caixa de presente
+    assert fichas[0].embalagem.carton_mm == (435, 375, 340)
+    assert fichas[0].embalagem.pcs_por_carton == 8
+    assert all(f.foto for f in fichas)
+    assert fichas[0].certificacoes == ["NSF"]
+
+
+def test_titulo_de_secao_no_pdf_nao_vira_produto():
+    """`Electric Knife sharpener` é o título acima dos três afiadores.
+
+    A linha tem a identidade preenchida e todo o resto vazio. Entrava na lista
+    como um produto sem preço, sem foto e sem descrição — que podia ser marcado
+    e gravado no Funil como se fosse um item de verdade.
+    """
+    fichas = ler_cotacao(KHC)
+
+    assert "Electric Knife sharpener" not in [f.modelo for f in fichas]
+    # e não se perde: vira a categoria dos produtos abaixo dela
+    afiadores = [f for f in fichas if f.modelo.startswith("ELS")]
+    assert afiadores
+    assert all(f.categoria == "Electric Knife sharpener" for f in afiadores)
 
 
 def test_a_propria_npd_nao_e_lida_como_cotacao():

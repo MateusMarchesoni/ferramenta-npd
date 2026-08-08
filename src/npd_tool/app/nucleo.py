@@ -302,7 +302,13 @@ class Sessao:
             except Exception as erro:
                 # um PDF ilegível não pode impedir que as outras seis cotações
                 # apareçam na tela
-                erros.append(f"{arquivo.name}: {erro}")
+                # as recusas do `ingest` já começam com o nome do arquivo, e
+                # prefixar de novo produzia "KHC quotation 2.pdf: KHC
+                # quotation 2.pdf: abri o PDF mas…"
+                mensagem = str(erro)
+                if not mensagem.startswith(arquivo.name):
+                    mensagem = f"{arquivo.name}: {mensagem}"
+                erros.append(mensagem)
 
         self.arquivos = arquivos
         self.candidatos = candidatos

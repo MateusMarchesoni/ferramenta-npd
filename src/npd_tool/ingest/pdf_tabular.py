@@ -97,6 +97,11 @@ _TRADUCAO_COMPARTILHADA = {
     "certificado": "certificado",
     "foto": "foto",
     "indice": "indice",
+    # colunas dedicadas de embarque. Quando existem, elas trazem só o número
+    # (`435*375*340`, `8`) — sem a palavra "carton" que `_embalagem_de`
+    # procurava no texto —, e por isso precisam de papel próprio.
+    "embalagem": "carton",
+    "pcs_por_caixa": "pcs_ctn",
 }
 
 
@@ -162,6 +167,19 @@ def _fornecedor_e_data(pdf) -> tuple[str, date | None, str | None]:
     return fornecedor, data_cotacao, incoterm
 
 
+# o que, estando vazio, indica que a linha não descreve um produto
+_CAMPOS_DE_PRODUTO = (
+    "produto", "descricao", "preco", "dimensoes", "carton",
+    "pcs_ctn", "qty", "moq", "cbm", "certificado",
+)
+
+
+def _so_tem_identidade(dados: dict, specs_extras: dict) -> bool:
+    if dados.get("foto") or specs_extras:
+        return False
+    return not any(dados.get(campo) for campo in _CAMPOS_DE_PRODUTO)
+
+
 def _corrigir_continuacao(linhas_dados: list[dict]) -> None:
     """Conserta texto que vazou de uma linha para a seguinte na extração.
 
@@ -225,12 +243,30 @@ def _precos_da_celula(
     return precos
 
 
-def _embalagem_de(texto_dimensoes: str | None, cbm: Decimal | None, qty: int | None) -> Embalagem:
+def _embalagem_de(
+    texto_dimensoes: str | None,
+    cbm: Decimal | None,
+    qty: int | None,
+    carton: str | None = None,
+    pcs_ctn: int | None = None,
+) -> Embalagem:
+    """`carton` e `pcs_ctn` vêm de colunas dedicadas, quando a cotação as tem.
+
+    Elas vencem o garimpo no texto de dimensões: uma coluna intitulada
+    `Carton sizes (mm)` é declaração do fornecedor sobre a caixa de embarque,
+    enquanto procurar a palavra "carton" no meio de um texto é interpretação
+    nossa — e é a interpretação que pode pegar a caixa de presente por engano
+    e estragar o m³ (PLANO.md 6.4).
+    """
+    from npd_tool.ingest.comum import extrair_dimensoes_mm
+
     emb = Embalagem(cbm_total=cbm, qty_referencia=qty)
+    if carton:
+        emb.carton_mm = extrair_dimensoes_mm(carton)
+    if pcs_ctn:
+        emb.pcs_por_carton = pcs_ctn
     if not texto_dimensoes:
         return emb
-
-    from npd_tool.ingest.comum import extrair_dimensoes_mm
 
     for linha in linhas_nao_vazias(texto_dimensoes):
         baixa = linha.lower()
@@ -256,6 +292,7 @@ def parse_pdf_tabular(caminho: Path) -> list[Ficha]:
     with pdfplumber.open(caminho) as pdf:
         fornecedor, data_cotacao, incoterm = _fornecedor_e_data(pdf)
         linhas_dados: list[dict] = []
+        categoria_corrente: str | None = None
 
         for numero_pagina, page in enumerate(pdf.pages, start=1):
             fotos = fotos_da_pagina(page)
@@ -310,23 +347,36 @@ def parse_pdf_tabular(caminho: Path) -> list[Ficha]:
                             bbox_coluna_foto[1] if bbox_coluna_foto else None,
                         )
 
-                    linhas_dados.append(
-                        {
-                            "modelo": modelo,
-                            "produto": pega("produto"),
-                            "descricao": pega("descricao") or "",
-                            "dimensoes": pega("dimensoes"),
-                            "qty": primeiro_inteiro(pega("qty")),
-                            "preco": pega("preco"),
-                            "moq": pega("moq"),
-                            "cbm": pega("cbm"),
-                            "certificado": pega("certificado"),
-                            "specs_extras": specs_extras,
-                            "foto": foto,
-                            "pagina": numero_pagina,
-                            "avisos": [],
-                        }
-                    )
+                    dados_linha = {
+                        "modelo": modelo,
+                        "produto": pega("produto"),
+                        "descricao": pega("descricao") or "",
+                        "dimensoes": pega("dimensoes"),
+                        "carton": pega("carton"),
+                        "pcs_ctn": primeiro_inteiro(pega("pcs_ctn")),
+                        "qty": primeiro_inteiro(pega("qty")),
+                        "preco": pega("preco"),
+                        "moq": pega("moq"),
+                        "cbm": pega("cbm"),
+                        "certificado": pega("certificado"),
+                        "specs_extras": specs_extras,
+                        "foto": foto,
+                        "pagina": numero_pagina,
+                        "avisos": [],
+                    }
+
+                    # Uma linha com a identidade preenchida e todo o resto
+                    # vazio é título de seção — "Electric Knife sharpener"
+                    # acima dos três modelos de afiador. Virava um produto sem
+                    # preço, sem foto e sem descrição, que ia para a tela do
+                    # mesmo jeito e podia ser marcado e gravado no Funil.
+                    # Vira a categoria dos produtos que vêm abaixo.
+                    if _so_tem_identidade(dados_linha, specs_extras):
+                        categoria_corrente = modelo
+                        continue
+                    dados_linha.setdefault("categoria", categoria_corrente)
+
+                    linhas_dados.append(dados_linha)
 
         _corrigir_continuacao(linhas_dados)
 
@@ -366,7 +416,11 @@ def parse_pdf_tabular(caminho: Path) -> list[Ficha]:
 
             descricao = (dados["descricao"] or "").strip()
             embalagem = _embalagem_de(
-                dados["dimensoes"] or descricao, cbm, dados["qty"]
+                dados["dimensoes"] or descricao,
+                cbm,
+                dados["qty"],
+                carton=dados.get("carton"),
+                pcs_ctn=dados.get("pcs_ctn"),
             )
 
             fichas.append(
@@ -377,7 +431,7 @@ def parse_pdf_tabular(caminho: Path) -> list[Ficha]:
                     validade=None,
                     modelo=dados["modelo"],
                     descricao_bruta=descricao,
-                    categoria=dados["produto"],
+                    categoria=dados["produto"] or dados.get("categoria"),
                     specs=specs,
                     precos=precos,
                     embalagem=embalagem,

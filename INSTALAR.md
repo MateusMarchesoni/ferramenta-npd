@@ -199,6 +199,10 @@ importam tanto quanto ele:
   original, nunca inventar dado.
 - `tests/fixtures/` — as cotações reais e a cópia da NPD. Os testes rodam
   contra elas, não contra dados de mentira; sem as fixtures a suíte não roda.
+  Além das oito cotações originais, `test_cotacao_nova.py` precisa de
+  `KHC quotation 2.pdf` — a primeira cotação de fornecedor novo que apareceu
+  depois da entrega, e a que mostrou que a lista exata de rótulos nunca ia
+  bastar. Toda cotação que quebrar a leitura merece virar fixture aqui.
 
 E os roteiros manuais, que testam o que teste automático não alcança:
 
