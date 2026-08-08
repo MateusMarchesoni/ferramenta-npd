@@ -40,14 +40,20 @@ incluindo o de Mac Intel — que é o único sistema sem versão de janela.
 ## Em uma olhada
 
 Há um aplicativo com janela — ícone, lista com foto, custo antes de gravar — e
-os três comandos de terminal que existiam antes dele. Os dois passam pelas
-mesmas funções; o app é uma casca por cima, não um segundo programa.
+os comandos de terminal que existiam antes dele. Os dois passam pelas mesmas
+funções; o app é uma casca por cima, não um segundo programa.
 
 ```
+npd-tool preparar               prepara a aba `Pesos` — uma vez por planilha
 npd-tool abrir  cotacao.pdf     lista os produtos na aba `Candidatos`
 npd-tool conferir               calcula o custo do que foi marcado
 npd-tool gravar                 lança no Funil e na Priorizacao
 ```
+
+O `preparar` grava na aba `Pesos` os parâmetros de custo e a tabela de NCM com
+as alíquotas de II e IPI. Sem ele a tabela está vazia, e um NCM correto
+digitado na seleção não encontra alíquota nenhuma — o custo sai em branco sem
+que nada pareça errado. No app é o botão **Preparar planilha**.
 
 Ou, sem digitar nada: os arquivos de cotação vão para a pasta `cotações/` e a
 pessoa clica nos três atalhos, na ordem.

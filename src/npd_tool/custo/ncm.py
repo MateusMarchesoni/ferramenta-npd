@@ -147,6 +147,35 @@ def ler_da_planilha(caminho, aba: str = "Pesos") -> TabelaNCM:
         wb.close()
 
 
+def ler_com_partida(caminho, aba: str = "Pesos") -> tuple[TabelaNCM, str | None]:
+    """A tabela da planilha; se ela não existir, a de partida, com o aviso.
+
+    Existe porque a planilha em uso não tinha a seção de custo, e o efeito
+    disso era mudo: a pessoa digitava o NCM certo, a busca não achava, e o
+    custo saía vazio sem dizer por quê. Cair na tabela de partida faz a conta
+    acontecer; devolver o aviso junto é o que impede a queda de passar
+    despercebida.
+
+    A mesma escolha já valia para os parâmetros — `parametros.ler_da_planilha`
+    devolve os defaults quando a seção não está lá. Aqui é a coerência disso,
+    não uma liberdade nova: nenhum dos dois inventa número, os dois usam um
+    valor de fonte conhecida e marcado como não conferido.
+    """
+    tabela = ler_da_planilha(caminho, aba)
+    if len(tabela):
+        return tabela, None
+
+    from npd_tool.custo.tabela_padrao import tabela_de_partida
+
+    return tabela_de_partida(), (
+        "A aba `Pesos` desta planilha ainda não tem a tabela de NCM. A "
+        "ferramenta está usando a tabela de partida embutida (7 códigos de "
+        "cozinha profissional, alíquotas das fontes oficiais, nenhuma conferida "
+        "pelo despachante). Use `Preparar planilha` para gravar a tabela na aba "
+        "`Pesos` — lá ela fica visível e editável."
+    )
+
+
 def sugerir_por_categoria(
     tabela: TabelaNCM, categoria: str | None
 ) -> tuple[AliquotasNCM | None, str | None]:

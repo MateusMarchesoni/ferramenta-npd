@@ -1,8 +1,14 @@
-"""Os três comandos da ferramenta.
+"""Os comandos da ferramenta.
 
+    npd-tool preparar                                prepara a aba `Pesos` (uma vez)
     npd-tool abrir    cotação.xlsx [outra.pdf ...]   monta a aba `Candidatos`
     npd-tool conferir                                calcula e devolve a prévia
     npd-tool gravar                                  lança no Funil e na Priorizacao
+
+O `preparar` roda uma vez por planilha: ele grava na aba `Pesos` os parâmetros
+de custo e a tabela de NCM. Sem ele a tabela de NCM está vazia, e um NCM
+digitado corretamente na seleção não encontra alíquota nenhuma — o custo sai em
+branco sem que nada pareça errado.
 
 Há dois jeitos de dizer onde estão os arquivos:
 
@@ -119,14 +125,54 @@ def _cotacoes_da_pasta(pasta: Path) -> list[Path]:
 
 def _parametros_e_ncm(planilha: Path):
     parametros = mod_par.ler_da_planilha(planilha)
-    tabela = mod_ncm.ler_da_planilha(planilha)
+    tabela, aviso_ncm = mod_ncm.ler_com_partida(planilha)
     if parametros["markup_minimo_revenda"].linha is None:
         print(
             "aviso: a aba `Pesos` ainda não tem a seção de parâmetros de custo. "
-            "A coluna P (revenda mínima) vai ficar vazia.",
+            "A coluna P (revenda mínima) vai ficar vazia. "
+            "Rode `npd-tool preparar` para gravá-la.",
             file=sys.stderr,
         )
+    if aviso_ncm:
+        print(f"aviso: {aviso_ncm}", file=sys.stderr)
     return parametros, tabela
+
+
+def comando_preparar(args) -> int:
+    """Grava a seção de custo e a tabela NCM na aba `Pesos`.
+
+    Existe porque `escrever_parametros_custo` só era chamada por script de
+    teste: a planilha em uso nunca recebeu a seção, e sem a tabela NCM nenhum
+    custo é calculado, por mais correto que seja o código digitado.
+    """
+    from npd_tool.custo.tabela_padrao import tabela_de_partida
+    from npd_tool.escrita.backup import fazer_backup
+    from npd_tool.escrita.ooxml import escrever_parametros_custo
+
+    planilha = _planilha(args)
+    parametros = mod_par.ler_da_planilha(planilha)
+    tabela = mod_ncm.ler_da_planilha(planilha)
+
+    acrescentados = 0
+    if not len(tabela):
+        tabela = tabela_de_partida()
+        acrescentados = len(tabela)
+
+    # a seção é reescrita inteira, da linha 44 para baixo: backup antes
+    backup = fazer_backup(planilha)
+    info = escrever_parametros_custo(planilha, planilha, parametros, tabela)
+
+    print(f"aba `Pesos` de {planilha.name} preparada.")
+    print(f"  seção de custo: linhas {info['primeira_linha']}–{info['ultima_linha']}")
+    print(f"  NCM na tabela:  {len(tabela)}")
+    print(f"  backup:         {backup}")
+    if acrescentados:
+        print(
+            f"\nOs {acrescentados} NCM são um PONTO DE PARTIDA, das fontes oficiais, "
+            "e nenhum\nfoi conferido pelo despachante. Todo custo vai sair com esse "
+            "aviso até\nalguém preencher data e responsável nas duas últimas colunas."
+        )
+    return 0
 
 
 def comando_abrir(args) -> int:
@@ -358,6 +404,12 @@ def construir_parser() -> argparse.ArgumentParser:
         "gravar", help="lança os marcados no Funil e na Priorizacao"
     )
     gravar.set_defaults(funcao=comando_gravar)
+
+    preparar = sub.add_parser(
+        "preparar",
+        help="grava a seção de parâmetros de custo e a tabela NCM na aba Pesos",
+    )
+    preparar.set_defaults(funcao=comando_preparar)
 
     versao = sub.add_parser(
         "versao", help="mostra a versão e confere se a instalação está completa"

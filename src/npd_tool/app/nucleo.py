@@ -155,7 +155,7 @@ class Sessao:
 
         self.avisos_da_planilha = []
         self._parametros = mod_par.ler_da_planilha(self.planilha)
-        self._tabela_ncm = mod_ncm.ler_da_planilha(self.planilha)
+        self._tabela_ncm, aviso_ncm = mod_ncm.ler_com_partida(self.planilha)
         self._assinatura_planilha = assinatura
 
         if self._parametros["markup_minimo_revenda"].linha is None:
@@ -163,6 +163,8 @@ class Sessao:
                 "A aba `Pesos` ainda não tem a seção de parâmetros de custo — a "
                 "coluna P (revenda mínima) vai ficar vazia."
             )
+        if aviso_ncm:
+            self.avisos_da_planilha.append(aviso_ncm)
         nao_confirmados = self._parametros.nao_confirmados
         if nao_confirmados:
             self.avisos_da_planilha.append(
@@ -178,6 +180,61 @@ class Sessao:
             )
         return self._parametros, self._tabela_ncm
 
+    def preparar_planilha(self) -> dict:
+        """Grava a seção de parâmetros de custo e a tabela NCM na aba `Pesos`.
+
+        É a operação que faltava ter um botão: a função existia desde a Etapa 5
+        e só era chamada por script de teste, então a planilha em uso nunca a
+        recebeu. Sem ela, a tabela NCM da planilha está vazia e todo NCM
+        digitado cai no vazio.
+
+        Preserva a tabela que já estiver lá — quem já cadastrou alíquota com o
+        despachante não pode perdê-la para um botão de preparação.
+        """
+        if self.planilha is None:
+            raise ErroDoApp("escolha a planilha NPD primeiro")
+
+        from npd_tool.custo.tabela_padrao import tabela_de_partida
+        from npd_tool.escrita.ooxml import escrever_parametros_custo
+
+        parametros, _ = self.carregar_parametros()
+        tabela = mod_ncm.ler_da_planilha(self.planilha)
+        acrescentados = 0
+        if not len(tabela):
+            tabela = tabela_de_partida()
+            acrescentados = len(tabela)
+
+        # `escrever_parametros_custo` descarta tudo o que estiver na `Pesos` da
+        # linha 44 para baixo. É reescrita, não acréscimo — backup antes, como
+        # em toda gravação (PLANO.md 7.2).
+        from npd_tool.escrita.backup import fazer_backup
+
+        backup = fazer_backup(self.planilha)
+
+        try:
+            info = escrever_parametros_custo(
+                self.planilha, self.planilha, parametros, tabela
+            )
+        except PermissionError:
+            raise ErroDoApp(
+                f"não consegui gravar em {self.planilha.name} — provavelmente ela "
+                "está aberta no Excel. Feche a planilha e tente de novo."
+            )
+        except PlanilhaXlsxError as erro:
+            raise ErroDoApp(str(erro))
+
+        self._assinatura_planilha = ()  # a planilha mudou; reler `Pesos`
+        self.carregar_parametros()
+
+        return {
+            "linhas": [info["primeira_linha"], info["ultima_linha"]],
+            "ncms": len(tabela),
+            "acrescentados": acrescentados,
+            "planilha": str(self.planilha),
+            "backup": str(backup),
+            "avisos": list(self.avisos_da_planilha),
+        }
+
     def descricao_da_planilha(self) -> dict:
         if self.planilha is None:
             return {}
@@ -187,6 +244,21 @@ class Sessao:
             "nome": self.planilha.name,
             "pasta": str(self.planilha.parent),
             "ncms": len(tabela),
+            # a tela usa isto para oferecer os códigos em vez de exigir que a
+            # pessoa decore oito dígitos — digitar errado é a outra metade do
+            # "coloquei o NCM e não calculou"
+            "tabela_ncm": [
+                {
+                    "ncm": mod_ncm.formatar_ncm(entrada.ncm),
+                    "descricao": entrada.descricao,
+                    "ii": str(entrada.aliquota_ii),
+                    "ipi": str(entrada.aliquota_ipi),
+                }
+                for entrada in sorted(
+                    tabela.entradas.values(), key=lambda e: e.ncm
+                )
+            ],
+            "precisa_preparar": parametros["markup_minimo_revenda"].linha is None,
             "avisos": list(self.avisos_da_planilha),
         }
 

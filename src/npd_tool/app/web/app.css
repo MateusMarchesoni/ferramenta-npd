@@ -402,6 +402,13 @@ h1, h2, h3, p { margin: 0; }
 
 .botao-perigo { color: var(--vermelho); }
 
+/* uma pendência de configuração, não um erro: chama mas não alarma */
+.botao-atencao {
+  border-color: color-mix(in srgb, var(--laranja) 45%, transparent);
+  color: color-mix(in srgb, var(--laranja) 82%, var(--rotulo));
+}
+.botao-atencao:hover { background: color-mix(in srgb, var(--laranja) 12%, transparent); }
+
 .botao-redondo {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; padding: 0;
@@ -544,6 +551,13 @@ h1, h2, h3, p { margin: 0; }
 }
 .campo:focus { box-shadow: var(--anel-foco); }
 .campo::placeholder { color: var(--rotulo-3); }
+
+/* NCM com oito dígitos que não está na tabela da aba `Pesos`: o custo vai sair
+   vazio, e o único momento em que dá para consertar isso é agora */
+.campo-alerta {
+  border-color: color-mix(in srgb, var(--laranja) 60%, transparent);
+  background: color-mix(in srgb, var(--laranja) 10%, var(--fundo-campo));
+}
 
 /* controle segmentado do macOS: a cápsula desliza, não pisca */
 .segmentado {

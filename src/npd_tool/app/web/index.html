@@ -82,6 +82,13 @@
           <svg viewBox="0 0 24 24" class="glifo busca-glifo" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2"/><path d="M15.2 15.2 20 20"/></svg>
           <input type="search" id="busca" placeholder="Buscar" aria-label="Buscar produto">
         </div>
+        <!-- só aparece enquanto a aba `Pesos` não tem a seção de custo: sem
+             ela a tabela de NCM está vazia e nenhum custo é calculado -->
+        <button class="botao botao-atencao" id="botao-preparar" type="button" hidden
+                title="Grava a seção de parâmetros de custo e a tabela de NCM na aba Pesos (faz backup antes)">
+          <svg viewBox="0 0 24 24" class="glifo" aria-hidden="true"><path d="M12 4.6 21 19.4H3z"/><path d="M12 10v4.2M12 16.8v.1"/></svg>
+          Preparar planilha
+        </button>
         <button class="botao" id="botao-cotacoes" type="button" hidden>
           <svg viewBox="0 0 24 24" class="glifo" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg>
           Adicionar cotações
@@ -103,6 +110,9 @@
       </div>
 
       <div class="lista" id="lista"></div>
+
+      <!-- os NCM cadastrados na aba `Pesos`, oferecidos em todo campo de NCM -->
+      <datalist id="lista-ncm"></datalist>
 
       <div class="vazio" id="vazio">
         <div class="vazio-glifo" id="vazio-glifo"></div>

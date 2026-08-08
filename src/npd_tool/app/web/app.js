@@ -264,6 +264,9 @@ function linhaDeCandidato(candidato) {
     el("div", { class: "subtexto", texto: [candidato.fornecedor, candidato.modelo].filter(Boolean).join(" · ") }),
   ]);
 
+  // O campo é ligado à lista de NCM da planilha (`datalist`): digitar oito
+  // dígitos de cabeça é a outra metade do "coloquei o NCM e não calculou" — um
+  // dígito trocado dá exatamente o mesmo resultado que não preencher nada.
   const ncm = el("input", {
     class: "campo",
     placeholder: "0000.00.00",
@@ -271,11 +274,24 @@ function linhaDeCandidato(candidato) {
     inputmode: "numeric",
     "aria-label": "NCM",
     maxlength: "12",
+    list: "lista-ncm",
+    autocomplete: "off",
   });
+  const marcarNcm = () => {
+    const digitos = ncm.value.replace(/\D/g, "");
+    const desconhecido = digitos.length === 8 && !ncmCadastrado(digitos);
+    ncm.classList.toggle("campo-alerta", desconhecido);
+    ncm.title = desconhecido
+      ? "Este NCM não está na tabela da aba Pesos — sem alíquota de II e IPI o " +
+        "custo não é calculado. Cadastre-o na aba Pesos ou escolha um da lista."
+      : "";
+  };
   ncm.addEventListener("input", () => {
     candidato.ncm = ncm.value;
+    marcarNcm();
     salvarEscolhas();
   });
+  marcarNcm();
 
   const marca = segmentado(candidato, () => {
     desenharLista();
@@ -589,14 +605,57 @@ async function definirPlanilha(caminho) {
   }
 }
 
+function ncmCadastrado(digitos) {
+  const tabela = (estado.planilha && estado.planilha.tabela_ncm) || [];
+  return tabela.some((e) => e.ncm.replace(/\D/g, "") === digitos);
+}
+
+function desenharListaNcm() {
+  const lista = $("lista-ncm");
+  lista.textContent = "";
+  ((estado.planilha && estado.planilha.tabela_ncm) || []).forEach((entrada) => {
+    // `option` com value e label: o Chrome mostra a descrição ao lado do
+    // código, que é o que permite escolher sem saber o número de cor
+    const opcao = el("option", { value: entrada.ncm });
+    opcao.label = entrada.descricao;
+    lista.appendChild(opcao);
+  });
+}
+
 function aplicarPlanilha(planilha) {
   estado.planilha = planilha;
   $("cartao-planilha-nome").textContent = planilha.nome;
   $("cartao-planilha-pasta").textContent = planilha.pasta;
   $("botao-cotacoes").hidden = false;
   $("subtitulo").textContent = `${planilha.nome} · ${planilha.ncms} NCM cadastrados`;
+  $("botao-preparar").hidden = !planilha.precisa_preparar;
+  desenharListaNcm();
   desenharLista();
   (planilha.avisos || []).forEach((aviso) => brinde(aviso, "aviso"));
+}
+
+async function prepararPlanilha() {
+  folhaDeProgresso(
+    "Preparando a planilha…",
+    "gravando a seção de custo e a tabela de NCM na aba Pesos"
+  );
+  try {
+    const dados = await api("preparar-planilha");
+    fecharFolha();
+    const acrescentados = dados.acrescentados
+      ? `, com ${dados.acrescentados} NCM de partida para o despachante conferir`
+      : "";
+    brinde(
+      `aba Pesos preparada (linhas ${dados.linhas[0]}–${dados.linhas[1]})${acrescentados}`,
+      "ok"
+    );
+    // relê a planilha para atualizar contagem, lista de NCM e o botão
+    const estadoNovo = await api("estado");
+    if (estadoNovo.planilha) aplicarPlanilha(estadoNovo.planilha);
+  } catch (erro) {
+    fecharFolha();
+    folhaDeErro(erro.message);
+  }
 }
 
 async function escolherCotacoes(pasta) {
@@ -641,9 +700,20 @@ async function conferir() {
     fecharFolha();
     desenharLista();
 
-    const semCusto = dados.previa.filter((p) => !p.custo).length;
-    if (semCusto) {
-      brinde(`${semCusto} sem custo calculado — faltou NCM ou alíquota na aba Pesos`, "aviso");
+    // "faltou NCM ou alíquota" é verdade e não ajuda: quem digitou o NCM lê
+    // isso como um bug. Dizer qual dos dois faltou, e em que produto, é o que
+    // transforma o aviso em algo acionável.
+    const semCusto = dados.previa.filter((p) => !p.custo);
+    if (semCusto.length) {
+      const semNcm = semCusto.filter((p) => !p.ncm).length;
+      const naoCadastrado = semCusto.filter(
+        (p) => p.ncm && !ncmCadastrado(String(p.ncm).replace(/\D/g, ""))
+      ).length;
+      const motivos = [];
+      if (semNcm) motivos.push(`${semNcm} sem NCM preenchido`);
+      if (naoCadastrado) motivos.push(`${naoCadastrado} com NCM fora da tabela da aba Pesos`);
+      const detalhe = motivos.length ? ` (${motivos.join(", ")})` : " — abra o produto para ver o motivo";
+      brinde(`${semCusto.length} sem custo calculado${detalhe}`, "aviso");
     } else {
       brinde("custo calculado; confira antes de gravar", "ok");
     }
@@ -783,6 +853,7 @@ async function iniciar() {
 
   $("cartao-planilha").addEventListener("click", escolherPlanilha);
   $("botao-cotacoes").addEventListener("click", () => escolherCotacoes(false));
+  $("botao-preparar").addEventListener("click", prepararPlanilha);
   $("botao-conferir").addEventListener("click", conferir);
   $("botao-gravar").addEventListener("click", gravar);
   $("fechar-inspetor").addEventListener("click", fecharInspetor);

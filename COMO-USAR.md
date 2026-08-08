@@ -39,6 +39,13 @@ A janela guia por quatro etapas, que aparecem na coluna da esquerda:
 
 1. **Planilha NPD** — clique no cartão de baixo e escolha o arquivo `.xlsx` da
    NPD. O programa lembra dela na próxima vez, então isto é só na primeira.
+
+   Se aparecer o botão laranja **Preparar planilha**, clique nele uma vez. Ele
+   grava na aba `Pesos` os parâmetros de custo e a tabela de NCM com as
+   alíquotas de II e IPI — é de lá que o cálculo lê. Faz backup antes, e
+   depois some sozinho. Enquanto a aba não tem essa tabela, a ferramenta usa
+   uma cópia embutida para não travar o cálculo, mas o despachante não tem
+   onde corrigi-la.
 2. **Cotações** — *Adicionar cotações* abre o seletor de arquivos. Pode marcar
    vários de uma vez, ou escolher uma pasta inteira. Os produtos aparecem numa
    lista com foto, fornecedor, preço em dólar e m³ por unidade.
@@ -165,6 +172,13 @@ Ele não fica de fora: fica marcado como pendente no relatório.
 
 Nunca chute o NCM por parecer com outro produto. Classificação errada gera
 multa, não só número errado.
+
+**O NCM digitado precisa estar cadastrado na aba `Pesos`.** É lá que ficam as
+alíquotas de II e IPI de cada código; sem elas não há o que calcular. O campo
+na tela oferece os códigos já cadastrados numa lista — use-a. Se você digitar
+oito dígitos que não estão na tabela, o campo fica laranja: esse é o aviso de
+que o custo vai sair vazio. Para acrescentar um código novo, abra a aba `Pesos`
+no Excel e preencha uma linha na tabela **Tabela NCM → alíquotas**.
 
 ## Passo 3 — conferir o custo
 

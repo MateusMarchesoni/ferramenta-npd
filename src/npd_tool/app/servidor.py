@@ -86,6 +86,9 @@ class Aplicacao:
         config.gravar(planilha=descricao["caminho"])
         return {"planilha": descricao}
 
+    def acao_preparar_planilha(self, _corpo) -> dict:
+        return self.sessao.preparar_planilha()
+
     def acao_escolher_cotacoes(self, corpo) -> dict:
         pasta = bool((corpo or {}).get("pasta"))
         inicial = config.ultima_pasta_de_cotacoes()
