@@ -27,6 +27,7 @@ from npd_tool.ingest.comum import (
     extrair_dimensoes_mm,
     numeros_do_texto,
     para_decimal,
+    primeiro_inteiro,
     texto_limpo,
 )
 from npd_tool.ingest.imagens import fotos_por_ancora_xlsx
@@ -64,6 +65,7 @@ class _Bloco:
     descricao: list[str] = field(default_factory=list)
     certificacoes: list[str] = field(default_factory=list)
     embalagem_txt: list[str] = field(default_factory=list)
+    moq: int | None = None
     avisos: list[str] = field(default_factory=list)
 
 
@@ -150,14 +152,43 @@ def _embalagem_de_textos(textos: list[str]) -> tuple[Embalagem, list[str]]:
     return emb, avisos
 
 
+def _e_layout_de_blocos(ws, linha_cabecalho: int, col_modelo: int) -> bool:
+    """A coluna de identidade tem buracos — cada produto ocupa várias linhas?
+
+    Este parser é o do catálogo em blocos, onde o modelo aparece uma vez e as
+    linhas seguintes (categoria, preço, descrição) ficam com a célula vazia. É
+    isso que ele sabe ler, e é a ausência dessas células vazias que diz que a
+    planilha é outra coisa: uma tabela comum, uma linha por produto.
+
+    A distinção existe porque devolver **meia leitura** é pior que devolver
+    nenhuma. Quem chama (`ler_cotacao`) só cai para o leitor genérico — que lê
+    tabela comum muito melhor — quando este aqui devolve lista vazia; um único
+    produto encontrado por acaso trava a cotação inteira num parser que não é
+    o dela.
+    """
+    preenchidas = [
+        linha
+        for linha in range(linha_cabecalho + 1, ws.max_row + 1)
+        if texto_limpo(ws.cell(row=linha, column=col_modelo).value)
+    ]
+    if len(preenchidas) < 2:
+        return True  # sem massa para decidir; o parser tenta e desiste sozinho
+    return len(preenchidas) < (preenchidas[-1] - preenchidas[0] + 1)
+
+
 def _blocos_da_aba(ws, linha_cabecalho: int, mapa: dict[str, int]) -> list[_Bloco]:
     col_modelo = mapa["modelo"]
     col_desc = mapa.get("descricao")
     col_cert = mapa.get("certificado")
     col_emb = mapa.get("embalagem")
+    col_preco = mapa.get("preco")
+    col_moq = mapa.get("moq")
 
     inicios: list[tuple[int, str]] = []
-    anterior_preenchida = True
+    # o cabeçalho não é uma célula de modelo preenchida: começar como se fosse
+    # fazia o **primeiro** produto da tabela nunca abrir bloco — ele sumia da
+    # cotação, e por estar em cima era o mais fácil de não notar faltando
+    anterior_preenchida = False
     for linha in range(linha_cabecalho + 1, ws.max_row + 1):
         valor = ws.cell(row=linha, column=col_modelo).value
         vazia = valor is None or not str(valor).strip()
@@ -204,6 +235,30 @@ def _blocos_da_aba(ws, linha_cabecalho: int, mapa: dict[str, int]) -> list[_Bloc
                 if e:
                     bloco.embalagem_txt.append(e)
 
+        # A coluna de preço, quando existe. No catálogo que originou este
+        # parser o preço vinha empilhado na própria coluna do modelo, e era só
+        # de lá que ele era lido; o mesmo layout de blocos com uma coluna
+        # `Unit Price` ao lado saía com o produto certo e o preço vazio.
+        if col_moq and bloco.moq is None:
+            for linha in range(bloco.linha_inicio, bloco.linha_fim + 1):
+                bloco.moq = primeiro_inteiro(texto_limpo(
+                    ws.cell(row=linha, column=col_moq).value
+                ))
+                if bloco.moq is not None:
+                    break
+
+        if not bloco.precos and col_preco:
+            for linha in range(bloco.linha_inicio, bloco.linha_fim + 1):
+                valor = ws.cell(row=linha, column=col_preco).value
+                preco = (
+                    Decimal(str(valor))
+                    if isinstance(valor, (int, float, Decimal))
+                    else _valor_de_preco(valor)
+                )
+                if preco is not None and preco > 0:
+                    bloco.precos.append((preco, "padrão"))
+                    break
+
         if em_acessorio:
             bloco.avisos.append(
                 "bloco contém acessório opcional cotado à parte — preço marcado como 'acessório opcional'"
@@ -219,6 +274,8 @@ def _parse_aba_blocos(
     if achado is None:
         return []
     linha_cabecalho, mapa = achado
+    if not _e_layout_de_blocos(ws, linha_cabecalho, mapa["modelo"]):
+        return []
 
     fotos = fotos_por_ancora_xlsx(ws)
     col_foto = mapa.get("foto", 1)
@@ -249,7 +306,7 @@ def _parse_aba_blocos(
                 moeda="USD",
                 incoterm=None,
                 rotulo=rotulo,
-                moq=None,
+                moq=bloco.moq,
                 origem=origem,
             )
             for valor, rotulo in bloco.precos

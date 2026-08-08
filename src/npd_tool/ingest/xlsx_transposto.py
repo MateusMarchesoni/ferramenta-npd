@@ -10,6 +10,14 @@ Ver PLANO.md seção 4.2. Estrutura recorrente por aba:
   linha 6+ blocos de specs, cada um terminando no bloco "Quotation"
   bloco Quotation: uma ou mais linhas "Unit Price..." e uma linha "MOQ"
 
+**As linhas são procuradas pelo rótulo, não pelo número.** A estrutura acima é
+a da Frespro, e continua valendo como último recurso; mas outra fábrica manda a
+mesma ficha com o cabeçalho duas linhas acima, e ler a linha 5 às cegas fazia a
+especificação técnica virar o nome do modelo — um produto no funil chamado
+"2.2L bowl, 550W, 2 speeds". Procurar `Model No.` na coluna da esquerda é o
+mesmo trabalho que o parser tabular faz nas colunas, com o mesmo vocabulário
+(`rotulos.py`).
+
 Regra do maior valor (seção 4.4): quando há mais de um preço para o mesmo
 produto (com/sem acessório, faixa de MOQ, montado/SKD), a ficha guarda
 todos em `precos`, mas normalizar/precos.py escolhe o maior. Aqui só
@@ -25,13 +33,43 @@ from pathlib import Path
 
 import openpyxl
 
+from npd_tool.ingest.comum import (
+    extrair_dimensoes_mm,
+    primeiro_inteiro,
+    texto_limpo,
+)
+from npd_tool.ingest.rotulos import papel_de
 from npd_tool.modelo import Embalagem, Ficha, Origem, Preco
 
+# As posições da ficha da Frespro, que foi a cotação a partir da qual este
+# parser foi escrito. Elas continuam valendo como **último recurso**: quando o
+# rótulo da linha não é reconhecido, a ficha do fornecedor conhecido ainda é
+# lida. O que não vale mais é *começar* por elas — outra fábrica usa a mesma
+# estrutura com o cabeçalho duas linhas acima, e ler a linha 5 às cegas fazia a
+# especificação técnica virar o nome do modelo.
 LINHA_IMAGEM = 3
 LINHA_CATEGORIA = 4
 LINHA_MODELO = 5
-ROTULO_QUOTATION = "quotation"
+LIMITE_DE_BUSCA = 12
 ROTULOS_SECAO_VAZIA = {"general specification", "features"}
+
+
+def _linha_do_papel(ws, papel: str, padrao: int | None) -> int | None:
+    """A linha cujo rótulo (coluna A) tem este papel, ou `padrao`.
+
+    A ficha transposta identifica cada linha pelo rótulo à esquerda; procurar
+    o rótulo é o mesmo trabalho que o parser tabular faz nas colunas, e é o que
+    torna o parser independente de qual fornecedor mandou o arquivo.
+    """
+    for linha in range(1, min(LIMITE_DE_BUSCA, ws.max_row) + 1):
+        if papel_de(ws.cell(row=linha, column=1).value) == papel:
+            # uma linha de rótulo só vale se houver produto à direita dela
+            if any(
+                texto_limpo(ws.cell(row=linha, column=col).value)
+                for col in range(2, min(ws.max_column, 12) + 1)
+            ):
+                return linha
+    return padrao
 
 
 @dataclass
@@ -92,6 +130,34 @@ def _parse_moq(valor) -> int | None:
     return int(m.group(0)) if m else None
 
 
+def _embalagem_da_coluna(itens: list) -> Embalagem:
+    """A embalagem de um produto, a partir das linhas de rótulo já classificadas.
+
+    Só o que o fornecedor escreveu na linha certa entra aqui — `Carton Size`
+    vira medida de embarque, `Product Size` nem chega a este ponto, porque o
+    vocabulário já lhe deu outro papel. É a mesma regra do parser tabular, pelo
+    mesmo motivo: a caixa errada produz um m³ errado que ninguém confere.
+    """
+    emb = Embalagem()
+    for papel, valor in itens:
+        texto = str(valor).strip()
+        if papel == "embalagem" and emb.carton_mm is None:
+            emb.carton_mm = extrair_dimensoes_mm(texto)
+        elif papel == "pcs_por_caixa" and emb.pcs_por_carton is None:
+            emb.pcs_por_carton = primeiro_inteiro(texto)
+        elif papel == "cbm" and emb.cbm_total is None:
+            cbm = _parse_decimal(valor)
+            if cbm is not None and cbm > 0:
+                emb.cbm_total = cbm
+        elif papel == "peso_liquido" and emb.peso_liquido_kg is None:
+            emb.peso_liquido_kg = _parse_decimal(valor)
+        elif papel == "peso_bruto" and emb.peso_bruto_kg is None:
+            emb.peso_bruto_kg = _parse_decimal(valor)
+    if emb.cbm_total is not None and emb.qty_referencia is None:
+        emb.qty_referencia = emb.pcs_por_carton or 1
+    return emb
+
+
 def _colunas_produto(ws, linha_modelo: int) -> dict[int, str]:
     colunas: dict[int, str] = {}
     for cell in ws[linha_modelo]:
@@ -102,13 +168,13 @@ def _colunas_produto(ws, linha_modelo: int) -> dict[int, str]:
     return colunas
 
 
-def _fotos_por_coluna(ws) -> dict[int, tuple[bytes, str]]:
+def _fotos_por_coluna(ws, linha_imagem: int) -> dict[int, tuple[bytes, str]]:
     fotos: dict[int, tuple[bytes, str]] = {}
     for img in getattr(ws, "_images", []):
         frm = img.anchor._from
         linha_1based = frm.row + 1
         coluna_1based = frm.col + 1
-        if linha_1based != LINHA_IMAGEM or coluna_1based == 1:
+        if linha_1based != linha_imagem or coluna_1based == 1:
             continue
         fotos[coluna_1based] = (img._data(), img.format)
     return fotos
@@ -132,10 +198,15 @@ def parse_xlsx_transposto(caminho: Path) -> list[Ficha]:
 
     for nome_aba in wb.sheetnames:
         ws = wb[nome_aba]
-        if ws.max_row < LINHA_MODELO:
+        linha_modelo = _linha_do_papel(ws, "modelo", None)
+        if linha_modelo is None:
+            linha_modelo = _linha_do_papel(ws, "nome", LINHA_MODELO)
+        linha_categoria = _linha_do_papel(ws, "categoria", LINHA_CATEGORIA)
+        linha_imagem = _linha_do_papel(ws, "foto", LINHA_IMAGEM)
+        if ws.max_row < linha_modelo:
             continue
 
-        colunas_produto = _colunas_produto(ws, LINHA_MODELO)
+        colunas_produto = _colunas_produto(ws, linha_modelo)
         if not colunas_produto:
             continue
 
@@ -143,14 +214,14 @@ def parse_xlsx_transposto(caminho: Path) -> list[Ficha]:
             ws.cell(row=2, column=1).value
         )
         categoria_por_coluna = {
-            col: str(ws.cell(row=LINHA_CATEGORIA, column=col).value).strip()
+            col: str(ws.cell(row=linha_categoria, column=col).value).strip()
             for col in colunas_produto
-            if ws.cell(row=LINHA_CATEGORIA, column=col).value is not None
+            if ws.cell(row=linha_categoria, column=col).value is not None
         }
         # algumas abas deixam `Category` em branco; o título da aba
         # ('Hot Shot Steamer Quotation') diz a mesma coisa e está no arquivo
         titulo_aba = _categoria_do_titulo(ws.cell(row=1, column=1).value)
-        fotos = _fotos_por_coluna(ws)
+        fotos = _fotos_por_coluna(ws, linha_imagem)
 
         produtos = {
             col: _Produto(
@@ -167,36 +238,64 @@ def parse_xlsx_transposto(caminho: Path) -> list[Ficha]:
         ultimo_rotulo: str | None = None
         em_quotation = False
         moq_por_coluna: dict[int, str] = {}
+        embalagem_por_coluna: dict[int, list] = {col: [] for col in produtos}
 
-        for row in ws.iter_rows(min_row=LINHA_MODELO + 1, max_row=ws.max_row):
+        for row in ws.iter_rows(min_row=linha_modelo + 1, max_row=ws.max_row):
             rotulo_celula = row[0].value
             rotulo = str(rotulo_celula).strip() if rotulo_celula is not None else None
+            papel = papel_de(rotulo) if rotulo else None
 
-            if rotulo and rotulo.strip().lower() == ROTULO_QUOTATION:
+            def _valores():
+                for col in produtos:
+                    valor = row[col - 1].value if col - 1 < len(row) else None
+                    if valor is not None and str(valor).strip():
+                        yield col, valor
+
+            if papel == "preco":
+                valores = list(_valores())
+                if valores:
+                    # o preço na própria linha do rótulo: `Quotation | 74 | 118`
+                    variante = re.sub(
+                        r"^\s*(unit\s+price|quotation|pre[çc]o)", "", rotulo,
+                        flags=re.IGNORECASE,
+                    ).strip(" -:") or "padrão"
+                    for col, valor in valores:
+                        decimal = _parse_decimal(valor)
+                        if decimal is not None:
+                            produtos[col].precos_brutos.append((variante, decimal, None))
+                    ultimo_rotulo = None
+                    continue
+                # rótulo de preço sem número é o **título** do bloco de preços,
+                # e as linhas seguintes é que trazem as variantes
                 em_quotation = True
                 ultimo_rotulo = None
                 continue
+
+            if papel == "moq":
+                for col, valor in _valores():
+                    moq_por_coluna[col] = str(valor)
+                ultimo_rotulo = None
+                continue
+
+            if papel in ("embalagem", "cbm", "pcs_por_caixa", "peso_liquido",
+                         "peso_bruto"):
+                for col, valor in _valores():
+                    embalagem_por_coluna[col].append((papel, valor))
+                    # continua valendo como spec: a linha de embalagem é parte
+                    # da ficha técnica que a pessoa lê na tela, e tirá-la de lá
+                    # esconderia informação que o fornecedor escreveu
+                    produtos[col].specs[rotulo] = str(valor).strip()
+                ultimo_rotulo = None
+                continue
+
             if rotulo and _linha_e_so_rotulo(row):
                 ultimo_rotulo = None
                 continue
 
+            # depois do bloco de preços vêm as condições gerais e o texto de
+            # marketing, que não são atributo de produto nenhum
             if em_quotation:
-                if rotulo is None:
-                    break
-                if rotulo.lower().startswith("unit price"):
-                    variante = rotulo[len("unit price") :].strip(" -:") or None
-                    for col, produto in produtos.items():
-                        valor = _parse_decimal(row[col - 1].value if col - 1 < len(row) else None)
-                        if valor is not None:
-                            produto.precos_brutos.append((variante or "padrão", valor, None))
-                    continue
-                if rotulo.lower() == "moq":
-                    for col in produtos:
-                        v = row[col - 1].value if col - 1 < len(row) else None
-                        if v is not None:
-                            moq_por_coluna[col] = str(v)
-                    continue
-                break  # passou de MOQ: bloco de marketing/condições gerais, ignora
+                break
 
             if rotulo is not None:
                 ultimo_rotulo = rotulo
@@ -246,6 +345,19 @@ def parse_xlsx_transposto(caminho: Path) -> list[Ficha]:
             if produto.foto is None:
                 avisos.append("foto não encontrada")
 
+            embalagem = _embalagem_da_coluna(embalagem_por_coluna.get(col, []))
+            if (
+                embalagem.carton_mm
+                and embalagem.pcs_por_carton is None
+                and embalagem.cbm_total is None
+            ):
+                # sem peças por caixa não há m³ unitário, e supor uma peça por
+                # caixa seria inventar o número que multiplica o frete
+                avisos.append(
+                    "medida de caixa encontrada mas peças por caixa não — m³ "
+                    "unitário não calculável"
+                )
+
             fichas.append(
                 Ficha(
                     fornecedor="Frespro",
@@ -257,7 +369,7 @@ def parse_xlsx_transposto(caminho: Path) -> list[Ficha]:
                     categoria=categoria,
                     specs=produto.specs,
                     precos=precos,
-                    embalagem=Embalagem(),
+                    embalagem=embalagem,
                     certificacoes=[],
                     foto=produto.foto,
                     foto_formato=produto.foto_formato,

@@ -97,3 +97,17 @@ pytest
 A suíte roda sobre as cotações reais e uma cópia da planilha, que **não estão
 no repositório** (ver `.gitignore`). O `INSTALAR.md` diz o que colocar em
 `tests/fixtures/`.
+
+Junto delas roda um **corpus de cotações-exemplo** (`tests/corpus/casos.py`):
+27 planilhas escritas em código, cada uma com um jeito diferente de dizer as
+mesmas coisas — chinês, espanhol, português com vírgula decimal, cabeçalho
+digitado errado, cabeçalho de dois andares, preço por faixa de quantidade,
+planilha sem cabeçalho nenhum — e 3 que não são cotação e precisam ser
+recusadas. Elas existem porque as oito cotações reais são poucas gente: uma
+regra escrita só a partir delas acerta nelas por construção e falha no primeiro
+fornecedor novo.
+
+```bash
+python -m tests.corpus.medir            # quanto da cotação a ferramenta lê sozinha
+python -m tests.corpus.medir --detalhe  # e qual campo faltou em qual produto
+```

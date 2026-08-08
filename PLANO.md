@@ -595,6 +595,48 @@ Todos com arquivos anexos ao projeto.
 
 Guardar uma cópia intacta da NPD em `tests/fixtures/` e comparar contra ela em cada execução da suíte.
 
+### 12.1 Corpus de cotações-exemplo — a amostra que a mesa não tem
+
+Os oito arquivos acima são a verdade, e são pouca gente. Toda regra de leitura
+escrita olhando só para eles acerta neles por construção; o buraco aparece no
+primeiro fornecedor novo, com a pessoa parada na frente do arquivo.
+
+`tests/corpus/casos.py` é a outra metade: **27 planilhas escritas por extenso,
+em Python**, cada uma com uma maneira diferente de dizer as mesmas coisas, mais
+**3 que não são cotação** e precisam ser recusadas. Elas cobrem o que a amostra
+real não tem: cotação só em chinês, em espanhol, em português com vírgula
+decimal; `Modle No.` e `Cartone size` digitados errado; cabeçalho de dois
+andares com `Carton (mm)` mesclado sobre `L | W | H`; linha de unidades abaixo
+dos títulos; preço por faixa de quantidade em três colunas; `Item size`,
+`Gift box size` e `Carton size` lado a lado; `Total Amount` ao lado de
+`Unit Price`; título de seção no meio da tabela; e a planilha sem cabeçalho
+nenhum.
+
+Ficam em código, e não como .xlsx no repositório, de propósito: um binário não
+aparece no diff, envelhece sem que ninguém veja e, com o tempo, vira mais uma
+amostra conhecida — o problema que o corpus existe para evitar. Cada caso
+carrega no campo `porque` o que ele está testando, e o gabarito de cada produto
+diz quais campos verificar (**chave ausente é ignorada; chave com `None` exige
+campo vazio**, porque "não extraiu" é resultado correto e testável).
+
+Duas maneiras de usar:
+
+```bash
+pytest tests/test_corpus.py          # cada caso é um teste; a falha diz o campo
+python -m tests.corpus.medir         # acerto por campo, em números
+python -m tests.corpus.medir --detalhe
+python -m tests.corpus.gerar --pasta saida/corpus   # abrir os arquivos no Excel
+```
+
+A medida separa **produto perdido** (a linha não virou ficha — a pessoa nem vê
+que faltou) de **campo vazio ou errado** (o produto apareceu sem preço — isso a
+tela mostra). São erros de gravidade diferente e a conta não os mistura.
+
+O corpus não substitui os casos reais acima: ele cobre variedade, e os arquivos
+reais cobrem a verdade. Uma regressão que só o corpus pega é uma variação que
+ninguém mandou ainda; uma que só os reais pegam é um detalhe que ninguém
+inventaria.
+
 ---
 
 ## 13. Perguntas em aberto

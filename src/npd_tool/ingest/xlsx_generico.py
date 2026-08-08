@@ -36,9 +36,14 @@ from pathlib import Path
 
 import openpyxl
 
+from npd_tool.ingest.cabecalho import (
+    fim_do_cabecalho,
+    preencher_mesclas_verticais,
+    rotulos_achatados,
+)
 from npd_tool.ingest.comum import extrair_dimensoes_mm, primeiro_inteiro, texto_limpo
 from npd_tool.ingest.imagens import fotos_por_ancora_xlsx
-from npd_tool.ingest.rotulos import mapear_papeis
+from npd_tool.ingest.rotulos import faixa_de_quantidade, mapear_papeis, mapear_todos
 from npd_tool.modelo import Embalagem, Ficha, Origem, Preco
 
 # Limites de varredura. Uma cotação com mais de 40 colunas ou 5.000 linhas não
@@ -71,6 +76,12 @@ _RE_MOEDA = re.compile(r"(usd|us\$|r\$|rmb|cny|eur|\$|€|¥)", re.IGNORECASE)
 _RE_BR = re.compile(r"^\d{1,3}(\.\d{3})+,\d+$")
 _RE_US = re.compile(r"^\d{1,3}(,\d{3})+(\.\d+)?$")
 _RE_VIRGULA_DECIMAL = re.compile(r"^\d+,\d{1,2}$")
+# a unidade colada no número: 'USD39.00/set', '45.00 /pc', '12,50/un'
+_RE_UNIDADE_DE_PRECO = re.compile(
+    r"/\s*(pcs?|pieces?|sets?|units?|un|unid|unidades?|ea|each|ctn|carton|"
+    r"cx|caixa|kg|pe[çc]as?)\.?$",
+    re.IGNORECASE,
+)
 
 # linhas que são rodapé de cotação, não produto
 _RE_RODAPE = re.compile(
@@ -101,6 +112,9 @@ def para_preco(valor) -> Decimal | None:
     texto = str(valor).replace("\xa0", " ").strip()
     texto = _RE_MOEDA.sub("", texto).strip()
     texto = texto.replace(" ", "")
+    # 'USD39.00/set' é o preço de um set, não uma divisão: a unidade é
+    # decoração e o número é o mesmo com ou sem ela
+    texto = _RE_UNIDADE_DE_PRECO.sub("", texto).strip()
     if not texto:
         return None
     # faixa de preço ('12.00-15.00'): fica com o maior, como o parser tabular
@@ -148,7 +162,7 @@ class _Coluna:
 
 
 def _grade(ws) -> list[list]:
-    """A aba como lista de linhas, limitada e 0-based."""
+    """A aba como lista de linhas, limitada e 0-based, com as mesclas resolvidas."""
     linhas = []
     for indice, linha in enumerate(
         ws.iter_rows(
@@ -161,7 +175,7 @@ def _grade(ws) -> list[list]:
         linhas.append(list(linha))
         if indice >= MAX_LINHAS:
             break
-    return linhas
+    return preencher_mesclas_verticais(linhas, ws)
 
 
 def _densidade(linha) -> int:
@@ -171,35 +185,68 @@ def _densidade(linha) -> int:
 def _regiao_de_dados(grade) -> tuple[int, int] | None:
     """O maior trecho de linhas seguidas com pelo menos duas células cheias.
 
+    Uma linha de uma célula só **no meio** do trecho não o interrompe: é o
+    título de seção ('Refrigeration', 'Cooking') que os catálogos usam para
+    separar famílias. Tratá-la como fim da tabela partia a cotação em pedaços e
+    a leitura ficava com o maior deles — os produtos depois do segundo título
+    sumiam sem aviso, que é o pior jeito de perder dado.
+
+    Duas linhas esparsas seguidas continuam sendo o fim: aí já é rodapé.
+
     Devolve (primeira, última) em índices 0-based da grade, ou None.
     """
     melhor = atual = None
+    pendente = None  # linha esparsa segurada à espera de dado depois dela
     for indice, linha in enumerate(grade):
-        if _densidade(linha) >= 2:
-            atual = (atual[0], indice) if atual else (indice, indice)
+        densidade = _densidade(linha)
+        if densidade >= 2:
+            if atual is None:
+                atual = (indice, indice)
+            else:
+                atual = (atual[0], indice)
             if melhor is None or (atual[1] - atual[0]) > (melhor[1] - melhor[0]):
                 melhor = atual
+            pendente = None
+        elif densidade == 1 and atual is not None and pendente is None:
+            pendente = indice
         else:
-            atual = None
+            atual = pendente = None
     if melhor is None or (melhor[1] - melhor[0] + 1) < MINIMO_DE_LINHAS_NA_REGIAO:
         return None
     return melhor
 
 
-def _cabecalho_por_vocabulario(grade, limite: int = 30) -> tuple[int, dict] | None:
-    """A linha de cabeçalho, quando algum rótulo conhecido aparece nela.
+def _cabecalho_por_vocabulario(grade, ws, primeira: int, ultima: int, limite: int = 30):
+    """O cabeçalho, quando algum rótulo conhecido aparece nele.
+
+    Devolve `(primeira, última, mapa, rótulos)` — todas as linhas do cabeçalho,
+    não só a primeira, porque `Carton (mm)` mesclado sobre `L | W | H` ocupa
+    duas e a de baixo não é produto.
 
     Vale menos que no detector — aqui basta **um** papel, porque este parser só
     roda depois de os parsers específicos terem desistido, e um `Price` isolado
     já é mais informação do que a forma sozinha.
     """
     melhor = None
-    for indice, linha in enumerate(grade[: min(limite, len(grade))]):
-        mapa = mapear_papeis(linha)
+    for indice in range(min(limite, len(grade))):
+        # um cabeçalho começa onde há texto: deixar uma linha vazia abrir o
+        # bloco faria o cabeçalho de verdade virar a *continuação* dela, e a
+        # linha de títulos entraria na tabela como se fosse um produto
+        if not _densidade(grade[indice]):
+            continue
+        fim = fim_do_cabecalho(grade, indice)
+        # Um cabeçalho encosta na tabela: ou é a primeira linha dela, ou está
+        # logo acima. Sem esta amarra, a linha de rodapé 'Note: prices are FOB
+        # Ningbo' virava cabeçalho — ela tem a palavra que o vocabulário
+        # reconhece como preço —, e a coluna 1 da tabela virava a de preço.
+        if not (primeira - 1 <= fim <= ultima):
+            continue
+        rotulos = rotulos_achatados(grade, ws, indice, fim)
+        mapa = mapear_papeis(rotulos)
         if not mapa:
             continue
-        if melhor is None or len(mapa) > len(melhor[1]):
-            melhor = (indice, mapa)
+        if melhor is None or len(mapa) > len(melhor[2]):
+            melhor = (indice, fim, mapa, rotulos)
     return melhor
 
 
@@ -273,6 +320,46 @@ def _eleger_preco(colunas: dict[int, _Coluna]) -> int | None:
     return melhor
 
 
+_RE_COMERCIAL = re.compile(
+    r"\b(fob|exw|cif|cfr|ddp|quotation|quote|cota[çc][ãa]o|proforma|price|"
+    r"pre[çc]o|payment|pagamento|moq|incoterm|t/t|l/c|lead\s*time|"
+    r"delivery|entrega|validity|validade)\b",
+    re.IGNORECASE,
+)
+
+
+def _e_documento_comercial(grade) -> bool:
+    """A planilha inteira parece uma oferta de fornecedor?
+
+    Pergunta diferente de "qual coluna é o preço", e por isso respondida com
+    outra evidência: a razão social no topo, ou o vocabulário de comércio
+    exterior em qualquer lugar do arquivo. Um controle de estoque tem código e
+    número como uma cotação tem, e não tem nada disto.
+    """
+    if not _identidade_fornecedor(grade).startswith("("):
+        return True
+    for linha in grade[:60]:
+        for bruto in linha:
+            texto = texto_limpo(bruto)
+            if texto and _RE_COMERCIAL.search(texto):
+                return True
+    return False
+
+
+def _parece_dinheiro(coluna: _Coluna | None) -> bool:
+    """A coluna tem centavos ou traz a moeda escrita?
+
+    Só é consultada quando o cabeçalho não disse nada e a coluna foi eleita
+    preço por eliminação. Nesse ponto, "tem casas decimais" é o que resta de
+    evidência de que aquilo é dinheiro e não contagem.
+    """
+    if coluna is None:
+        return False
+    return coluna.com_decimal > 0 or any(
+        _RE_MOEDA.search(texto) for texto in coluna.textos
+    )
+
+
 def _eleger_identidade(
     colunas: dict[int, _Coluna], evitar: set
 ) -> tuple[int | None, float]:
@@ -304,6 +391,29 @@ def _eleger_identidade(
         if ponto > melhor_ponto:
             melhor, melhor_ponto, melhor_codigo = coluna.indice, ponto, fracao_codigo
     return melhor, melhor_codigo
+
+
+def _identidade_do_cabecalho(rotulos: list, colunas: dict[int, _Coluna]) -> int | None:
+    """A coluna de identidade entre as que o cabeçalho indica, conferida no dado.
+
+    `Item` e `Item No.` são a mesma palavra para o vocabulário, e numa cotação
+    que tem as duas a primeira é a numeração da linha (1, 2, 3) e a segunda é o
+    código do produto. Escolher pela ordem entrega a numeração como identidade,
+    e aí toda linha é descartada por "identidade que é só número" — a cotação
+    inteira some com a mensagem de que não há produtos nela.
+
+    A regra de desempate não é mais vocabulário: é olhar o que está **embaixo**
+    do rótulo. Coluna de identidade tem texto; numeração de linha não tem.
+    """
+    if not rotulos:
+        return None
+    candidatas = mapear_todos(rotulos)
+    for papel in ("modelo", "nome"):
+        for indice in candidatas.get(papel, []):
+            coluna = colunas.get(indice)
+            if coluna is not None and coluna.textos:
+                return indice
+    return None
 
 
 def _eleger_descricao(colunas: dict[int, _Coluna], evitar: set) -> int | None:
@@ -364,13 +474,15 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
         return []
     primeira, ultima = regiao
 
-    achado = _cabecalho_por_vocabulario(grade)
+    achado = _cabecalho_por_vocabulario(grade, ws, primeira, ultima)
     mapa_papeis: dict[str, int] = {}
+    rotulos: list = []
     if achado is not None:
-        linha_cabecalho, mapa_papeis = achado
-        # o cabeçalho não é produto: a região começa depois dele
-        if primeira <= linha_cabecalho <= ultima:
-            primeira = linha_cabecalho + 1
+        linha_cabecalho, fim_cabecalho, mapa_papeis, rotulos = achado
+        # o cabeçalho não é produto: a região começa depois dele — e ele pode
+        # ter mais de uma linha (rótulo mesclado em cima, sub-rótulo embaixo)
+        if linha_cabecalho <= ultima and fim_cabecalho >= primeira:
+            primeira = fim_cabecalho + 1
     elif _e_cabecalho_por_forma(grade, primeira, ultima):
         primeira += 1
     if primeira > ultima:
@@ -380,9 +492,37 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
     if not colunas:
         return []
 
-    col_preco = mapa_papeis.get("preco") or _eleger_preco(colunas)
+    # a caixa espalhada em três colunas numéricas, uma por dimensão
+    cols_carton = mapear_todos(rotulos).get("carton_dimensao", []) if rotulos else []
+    # a unidade está no rótulo de cima ('Carton (cm) L'), e sem ela o m³ sai
+    # mil vezes errado
+    fator_carton = 10 if any(
+        re.search(r"\bcm\b", rotulos[c - 1], re.IGNORECASE)
+        for c in cols_carton
+        if c - 1 < len(rotulos)
+    ) else 1
+    # preço por faixa de quantidade: `1-49 pcs | 50-99 pcs | 100+`. Nenhuma
+    # das colunas é "o" preço — todas viram variante, com a faixa por rótulo.
+    faixas_de_preco = [
+        (indice, faixa)
+        for indice, rotulo in enumerate(rotulos, start=1)
+        for faixa in (faixa_de_quantidade(rotulo),)
+        if faixa
+    ]
+
+    col_preco = mapa_papeis.get("preco")
+    if col_preco is None and faixas_de_preco:
+        col_preco = faixas_de_preco[0][0]
+    if col_preco is None:
+        col_preco = _eleger_preco(colunas)
     evitar = {col_preco} if col_preco else set()
-    col_identidade = mapa_papeis.get("modelo") or mapa_papeis.get("nome")
+    if rotulos:
+        # a conferência no dado vale mais que a ordem das colunas; se nenhuma
+        # das candidatas do cabeçalho tem texto, é melhor cair na eleição por
+        # forma do que aceitar uma coluna de numeração como identidade
+        col_identidade = _identidade_do_cabecalho(rotulos, colunas)
+    else:
+        col_identidade = mapa_papeis.get("modelo") or mapa_papeis.get("nome")
     identidade_adivinhada = col_identidade is None
     fracao_codigo = 1.0
     if identidade_adivinhada:
@@ -390,13 +530,29 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
     if col_identidade is None:
         return []
 
-    # Quando nem a identidade veio de um rótulo, sobram dois sinais para
+    # Quando nem a identidade veio de um rótulo, sobram três sinais para
     # separar uma cotação de uma planilha qualquer com texto e números: haver
-    # preço, e a coluna de identidade parecer código de modelo. Uma agenda de
-    # ramais tem texto curto e números pequenos e passaria só no primeiro.
-    # Devolver uma lista de produtos inventada é pior do que devolver erro.
+    # preço, a coluna de identidade parecer código de modelo, e **os números
+    # parecerem dinheiro**.
+    #
+    # O terceiro sinal é o que separa uma cotação sem cabeçalho de um controle
+    # de estoque: os dois têm código na primeira coluna e número na última, e
+    # até aqui os dois passavam — o estoque virava três "produtos" com preço de
+    # 14, 8 e 22 dólares. Preço de equipamento tem centavos ou traz a moeda
+    # escrita; contagem de prateleira é inteiro seco. Devolver uma lista de
+    # produtos inventada é pior do que devolver erro.
+    #
+    # O terceiro sinal admite duas provas, porque cotação de verdade nem sempre
+    # tem centavos: ou os números parecem dinheiro, ou o documento inteiro
+    # parece comercial (fornecedor com razão social, FOB, condição de
+    # pagamento). Exigir só a primeira recusava a cotação de três linhas com
+    # preços redondos, que é um arquivo que existe.
     if identidade_adivinhada and (
-        col_preco is None or fracao_codigo < FRACAO_MINIMA_DE_CODIGO
+        col_preco is None
+        or fracao_codigo < FRACAO_MINIMA_DE_CODIGO
+        or not (
+            _parece_dinheiro(colunas.get(col_preco)) or _e_documento_comercial(grade)
+        )
     ):
         return []
 
@@ -408,6 +564,8 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
     col_pcs = mapa_papeis.get("pcs_por_caixa")
     col_foto = mapa_papeis.get("foto")
     col_certificado = mapa_papeis.get("certificado")
+    col_peso_liquido = mapa_papeis.get("peso_liquido")
+    col_peso_bruto = mapa_papeis.get("peso_bruto")
 
     # Só identidade e preço contam como adivinhação: errá-las troca o produto
     # ou o número que decide a compra. A descrição eleita por comprimento, no
@@ -416,7 +574,7 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
         rotulo
         for rotulo, coluna, veio_do_mapa in (
             ("identidade do produto", col_identidade, not identidade_adivinhada),
-            ("preço", col_preco, "preco" in mapa_papeis),
+            ("preço", col_preco, "preco" in mapa_papeis or bool(faixas_de_preco)),
         )
         if coluna is not None and not veio_do_mapa
     ]
@@ -427,6 +585,7 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
 
     fotos = fotos_por_ancora_xlsx(ws)
     fichas: list[Ficha] = []
+    categoria_corrente: str | None = None
 
     for indice_linha in range(primeira, ultima + 1):
         linha = grade[indice_linha]
@@ -449,9 +608,41 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
             preco_valor = None
         descricao = texto_limpo(celula(col_descricao)) or ""
 
-        # linha sem preço e sem descrição é separador, cabeçalho de seção ou
-        # sobra de formatação — não é produto
+        # Linha com a identidade preenchida e mais nada é título de seção
+        # ('Refrigeration'), não produto. Ela não se perde: vira a categoria
+        # dos produtos que vêm abaixo dela, que é o que ela significa para
+        # quem lê a cotação.
         if preco_valor is None and not descricao:
+            if _densidade(linha) == 1 and not _RE_CODIGO.match(identidade):
+                categoria_corrente = identidade
+            continue
+
+        # Duas linhas seguidas com o mesmo código são o mesmo produto: é o
+        # bloco de especificação que o fornecedor escreve em várias linhas,
+        # com o código mesclado por cima delas. Cada linha vira uma linha da
+        # descrição, e o que a primeira não trouxe (preço, embalagem) as
+        # seguintes completam — nunca sobrescrevem.
+        if fichas and fichas[-1].modelo == identidade:
+            anterior = fichas[-1]
+            if descricao and descricao not in anterior.descricao_bruta.splitlines():
+                anterior.descricao_bruta = (
+                    f"{anterior.descricao_bruta}\n{descricao}"
+                    if anterior.descricao_bruta
+                    else descricao
+                )
+            if preco_valor is not None and not anterior.precos:
+                anterior.precos.append(
+                    Preco(
+                        valor=preco_valor,
+                        moeda="USD",
+                        incoterm=None,
+                        rotulo="padrão",
+                        moq=primeiro_inteiro(texto_limpo(celula(col_moq)))
+                        if col_moq
+                        else None,
+                        origem=anterior.origem,
+                    )
+                )
             continue
 
         origem = Origem(
@@ -461,6 +652,7 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
             confianca=confianca,
         )
 
+        moq = primeiro_inteiro(texto_limpo(celula(col_moq))) if col_moq else None
         precos = []
         if preco_valor is not None:
             precos.append(
@@ -468,8 +660,22 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
                     valor=preco_valor,
                     moeda="USD",
                     incoterm=None,
-                    rotulo="padrão",
-                    moq=primeiro_inteiro(texto_limpo(celula(col_moq))) if col_moq else None,
+                    rotulo=(faixas_de_preco[0][1] if faixas_de_preco else "padrão"),
+                    moq=moq,
+                    origem=origem,
+                )
+            )
+        for coluna_faixa, faixa in faixas_de_preco[1:]:
+            valor_faixa = para_preco(celula(coluna_faixa))
+            if valor_faixa is None or not _e_preco_plausivel(valor_faixa):
+                continue
+            precos.append(
+                Preco(
+                    valor=valor_faixa,
+                    moeda="USD",
+                    incoterm=None,
+                    rotulo=faixa,
+                    moq=moq,
                     origem=origem,
                 )
             )
@@ -495,6 +701,22 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
             if cbm is not None and cbm > 0:
                 embalagem.cbm_total = cbm
                 embalagem.qty_referencia = embalagem.pcs_por_carton or 1
+        # a caixa em três colunas: `Carton (mm)` sobre `L | W | H`
+        if embalagem.carton_mm is None and len(cols_carton) == 3:
+            medidas = [para_preco(celula(c)) for c in cols_carton]
+            if all(m is not None and m > 0 for m in medidas):
+                embalagem.carton_mm = tuple(
+                    int(round(float(m) * fator_carton)) for m in medidas
+                )
+        for coluna_peso, atributo in (
+            (col_peso_liquido, "peso_liquido_kg"),
+            (col_peso_bruto, "peso_bruto_kg"),
+        ):
+            if not coluna_peso:
+                continue
+            peso = para_preco(celula(coluna_peso))
+            if peso is not None and peso > 0:
+                setattr(embalagem, atributo, peso)
 
         avisos_emb = []
         if embalagem.carton_mm and embalagem.pcs_por_carton is None and embalagem.cbm_total is None:
@@ -545,7 +767,7 @@ def _fichas_da_aba(ws, nome_arquivo: str) -> list[Ficha]:
                 validade=None,
                 modelo=identidade,
                 descricao_bruta=descricao,
-                categoria=None,
+                categoria=categoria_corrente,
                 specs={},
                 precos=precos,
                 embalagem=embalagem,
