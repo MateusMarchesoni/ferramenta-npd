@@ -93,35 +93,80 @@ Cada `.command` (no Windows, `.bat`) é uma linha só, chamando o executável.
 O fluxo vira: joga as cotações na pasta, clica no 1, escolhe na planilha,
 clica no 2, confere, clica no 3.
 
-Isso pede uma mudança pequena na ferramenta, que ainda **não** está feita: um
-modo em que ela descobre sozinha a planilha e as cotações pela pasta onde está,
-em vez de receber caminhos por argumento. É meia hora de trabalho e é o que
-transforma "roda em outro computador" em "outra pessoa usa sem você".
+O modo pasta que isso exige **está feito**: sem argumento nenhum, a ferramenta
+procura a planilha e as cotações a partir da pasta em que está rodando.
+
+### Nível 4 — o aplicativo com janela
+
+Um programa de verdade: ícone, janela, instalação por arrastar. É o pacote que
+se entrega hoje para quem só quer cadastrar produto.
+
+| Sistema | O que a pessoa baixa | O que ela faz |
+|---|---|---|
+| Windows 10/11 | `Instalar Ferramenta NPD.exe` | dois cliques, avançar, pronto |
+| Mac com chip M1/M2/M3/M4 | `Ferramenta-NPD-Mac-Apple-Silicon.dmg` | abre e arrasta para Aplicativos |
+
+Os dois saem do GitHub Actions a cada push para `main` (workflows *Aplicativo
+Windows* e *Aplicativo Mac*), em **Actions → a execução → Artifacts**.
+
+Para montar na mão, na máquina do sistema alvo:
+
+```bash
+pip install ".[app]" pyinstaller
+pyinstaller --clean --noconfirm --distpath dist-app distribuir/npd-app.spec
+
+# Mac: vira disco de instalação
+distribuir/macos/montar-dmg.sh 0.1.0
+
+# Windows: vira instalador (precisa do Inno Setup 6)
+iscc /DVersao=0.1.0 distribuir\windows\instalador.iss
+```
+
+**Confira antes de entregar.** O executável abrir não prova nada; o que prova é:
+
+```bash
+"dist-app/Ferramenta NPD.app/Contents/MacOS/Ferramenta NPD" --conferir
+```
+
+Ele importa cada leitor, confere que a tela veio dentro do pacote, sobe o
+servidor local, busca a própria página e testa que a API **recusa** quem não
+tem o token da sessão. Sai com código 1 se qualquer uma dessas coisas falhar —
+é o mesmo comando que as duas montagens automáticas rodam. No Windows, que não
+tem console para onde escrever, use `--conferir --relatorio conferencia.txt`.
+
+**A assinatura continua valendo o que está escrito acima**: nada é assinado, e
+os dois sistemas vão desconfiar na primeira abertura. No Mac, o aviso é
+resolvido em *Ajustes do Sistema → Privacidade e Segurança → Abrir Assim
+Mesmo* — o `Leia antes de abrir.txt` dentro do disco explica isso com todas as
+letras, e é a primeira coisa que a pessoa vê ao abrir o `.dmg`.
 
 ---
 
-## Sobre virar um app de verdade
+## Sobre a janela existir
 
-Vale dizer o que **não** recomendo, e por quê.
+A pergunta 13.5 escolheu a planilha como interface, e a versão de janela **não
+revoga** essa decisão — ela responde às duas objeções que a sustentavam.
 
-**Aplicativo de janela (Tkinter, PyQt, Electron):** seria mais bonito e é mais
-trabalho de manter do que a coisa toda que existe hoje. E contraria a decisão
-que já foi tomada com os olhos abertos: a interface é a planilha justamente
-porque ela sobrevive a uma ausência longa de quem construiu. Uma tela própria é
-mais uma coisa para quebrar quando ninguém estiver por perto para consertar.
+*"Uma tela própria é mais uma coisa para quebrar quando ninguém estiver por
+perto para consertar."* Por isso o pacote `app/` é uma casca: ele não escolhe
+preço, não calcula m³, não monta linha de Funil. Chama as mesmas funções que o
+`cli.py` chama, na mesma ordem. Se a tela sumir amanhã, os três comandos de
+terminal continuam funcionando — e é neles que o aceite da Etapa 7 é medido.
 
-**Aplicativo web / servidor:** resolve a distribuição de vez — todo mundo abre
-no navegador, sem instalar nada. Mas cria servidor para manter, backup para
-configurar e uma dependência de rede para uma tarefa que acontece algumas vezes
-por trimestre. Foi a opção 2 da pergunta 13.5, e foi descartada.
+*"Aplicativo web cria servidor para manter e dependência de rede."* O servidor
+aqui é local: sobe em `127.0.0.1`, numa porta sorteada, morre junto com a
+janela e exige um token por sessão. Não escuta na rede da empresa, não guarda
+dado e não tem nada para manter. Ele existe por um motivo só — permitir que a
+mesma tela funcione no navegador padrão quando a janela nativa não subir.
 
-**Macro no Excel chamando o executável:** daria o "tudo num arquivo só", mas
-obriga a planilha a virar `.xlsm`, e política de macro em empresa costuma
-bloquear. Trocar o formato da NPD para ganhar um botão é caro demais.
+O que **continua** valendo: a planilha segue sendo onde o julgamento humano
+acontece. O app cadastra o produto; as notas de 0 a 5 da `Priorizacao` são
+dadas no Excel, como sempre foram.
 
-A ordem que eu seguiria: **nível 3 primeiro** (o ganho real está em não abrir
-terminal), e só pensar em janela se a pessoa que usar reclamar de alguma coisa
-que a planilha não resolve.
+E o que continua **não** recomendado: **macro no Excel chamando o executável**.
+Daria o "tudo num arquivo só", mas obriga a NPD a virar `.xlsm`, e política de
+macro em empresa costuma bloquear. Trocar o formato da planilha para ganhar um
+botão é caro demais.
 
 ---
 

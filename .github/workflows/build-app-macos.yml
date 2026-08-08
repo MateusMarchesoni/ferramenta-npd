@@ -1,0 +1,73 @@
+# Monta o aplicativo de Mac — o de janela, com instalação por arrastar.
+#
+# Só Apple Silicon. O executável de terminal continua saindo para os dois
+# processadores (`build-macos.yml`); o aplicativo sai só para os Macs com chip
+# M, que é o parque que ele precisa atender. Fazer o dobro de pacotes de uma
+# coisa que ninguém pediu para Intel é dobrar a chance de entregar o errado.
+#
+# O resultado é um .dmg: baixa, abre, arrasta para Aplicativos.
+# Baixe em Actions -> a execução -> Artifacts.
+name: Aplicativo Mac
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest # Apple Silicon
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar a ferramenta, a janela e o PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[app]"
+          pip install pyinstaller
+
+      - name: Montar o aplicativo
+        run: pyinstaller --clean --noconfirm --distpath dist-app distribuir/npd-app.spec
+
+      - name: Conferir a arquitetura do binário
+        run: |
+          binario="dist-app/Ferramenta NPD.app/Contents/MacOS/Ferramenta NPD"
+          file "$binario"
+          if ! file -b "$binario" | grep -q "arm64"; then
+            echo "::error::esperava binário arm64, saiu: $(file -b "$binario")"
+            exit 1
+          fi
+
+      # A prova que importa. Não basta o programa abrir: a tela tem que estar
+      # dentro do pacote, o servidor local tem que servir a página com o token
+      # da sessão, a API tem que responder e — principalmente — tem que recusar
+      # quem não tem o token. Sem isto, um pacote sem `app/web` sai daqui, abre
+      # uma janela branca na mão do gestor e ninguém sabe por quê.
+      - name: Conferir que a cópia está completa
+        run: '"dist-app/Ferramenta NPD.app/Contents/MacOS/Ferramenta NPD" --conferir'
+
+      - name: Montar o disco de instalação
+        run: |
+          versao=$(python -c "import re,pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('src/npd_tool/__init__.py').read_text()).group(1))")
+          distribuir/macos/montar-dmg.sh "$versao"
+
+      - name: Conferir que o disco abre e o que tem dentro
+        run: |
+          hdiutil attach -nobrowse -quiet dist-instalador/*.dmg -mountpoint /tmp/npd
+          ls -la /tmp/npd
+          test -d "/tmp/npd/Ferramenta NPD.app"
+          test -L "/tmp/npd/Aplicativos"
+          test -f "/tmp/npd/Leia antes de abrir.txt"
+          "/tmp/npd/Ferramenta NPD.app/Contents/MacOS/Ferramenta NPD" --conferir
+          hdiutil detach /tmp/npd -quiet
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ferramenta-NPD-App-Mac-Apple-Silicon
+          path: dist-instalador/*.dmg
+          if-no-files-found: error

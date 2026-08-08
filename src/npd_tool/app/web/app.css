@@ -1,0 +1,833 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Ferramenta NPD — a folha de estilo.
+
+   Isto não é "um tema bonito": é a aplicação deliberada das quatro coisas que
+   fazem uma interface da Apple parecer da Apple. Vale escrever quais são,
+   porque cada regra abaixo existe por causa de uma delas.
+
+   1. CLAREZA — o texto é legível em qualquer tamanho, os ícones são exatos,
+      o ornamento é sutil e cada elemento tem uma função. Aqui: escala
+      tipográfica semântica do sistema (nada de tamanho arbitrário), números
+      em algarismos tabulares (coluna de preço que não dança), e peso mínimo
+      `regular` — nunca Ultralight/Thin/Light, que a própria Apple proíbe
+      desde que o SF Pro virou padrão.
+
+   2. DEFERÊNCIA — a interface serve o conteúdo e nunca compete com ele. Aqui:
+      o conteúdo (a lista de produtos) é opaco e sólido; o cromo (lateral,
+      barra de ferramentas, barra de ações) é translúcido e *dá passagem* ao
+      que rola por baixo. É a regra do Liquid Glass: vidro no controle, nunca
+      no conteúdo.
+
+   3. PROFUNDIDADE — camadas e movimento comunicam hierarquia. Aqui:
+      exatamente três planos (conteúdo → cromo → folha modal), cada um com uma
+      sombra própria, e transições que dizem de onde a coisa veio.
+
+   4. CONSISTÊNCIA — usar os elementos que a pessoa já conhece. Aqui: janela
+      de três painéis do macOS, controle segmentado, caixa de seleção
+      arredondada, botão-cápsula, anel de foco azul. Nada inventado.
+
+   As medidas seguem a grade de 8pt (com meio-passo de 4pt), o raio é sempre
+   contínuo — nunca canto vivo — e o alvo de clique nunca fica abaixo de 28px,
+   que é o mínimo confortável de mouse no macOS (os 44pt do HIG são a regra de
+   *toque*, e esta é uma ferramenta de mesa).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. tokens ─────────────────────────────────────────────────────────── */
+
+:root {
+  /* tipografia — a pilha do sistema, na ordem em que cada sistema responde.
+     SF Pro no Mac, Segoe UI Variable no Windows 11. Não embutimos fonte: a
+     licença do SF Pro não permite, e uma fonte errada é mais estranha que a
+     do próprio sistema. */
+  --fonte: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+           "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", sans-serif;
+  --fonte-numero: ui-monospace, "SF Mono", "SFMono-Regular", "Cascadia Mono",
+                  "Segoe UI Mono", Menlo, monospace;
+
+  /* escala semântica do macOS (o Mac é mais denso que o iPhone: corpo 13) */
+  --t-titulo-grande: 26px;
+  --t-titulo: 19px;
+  --t-titulo-secao: 15px;
+  --t-cabecalho: 13px;
+  --t-corpo: 13px;
+  --t-legenda: 11.5px;
+  --t-nota: 10.5px;
+
+  /* grade de 8 (com meio-passo de 4) */
+  --e1: 4px;  --e2: 8px;  --e3: 12px; --e4: 16px;
+  --e5: 20px; --e6: 24px; --e8: 32px; --e10: 40px;
+
+  /* raio: contêiner grande 16, médio 10–12, pequeno 6–8 */
+  --r-g: 16px; --r-m: 11px; --r-p: 7px; --r-capsula: 999px;
+
+  /* movimento — 0,15s para realce; a curva longa é a de folha do iOS */
+  --m-realce: .15s cubic-bezier(.4, 0, .2, 1);
+  --m-transicao: .28s cubic-bezier(.32, .72, 0, 1);
+  --m-folha: .42s cubic-bezier(.32, .72, 0, 1);
+
+  color-scheme: light dark;
+}
+
+/* claro — as cores do sistema, com os rótulos em alfa (é assim que o macOS
+   faz: preto com opacidade, não cinza sólido, para casar com qualquer fundo) */
+:root {
+  --azul: #007aff;      --azul-forte: #0060df;
+  --vermelho: #ff3b30;  --verde: #34c759;
+  --laranja: #ff9500;   --amarelo: #ffcc00;
+
+  --rotulo: rgba(0, 0, 0, .85);
+  --rotulo-2: rgba(0, 0, 0, .5);
+  --rotulo-3: rgba(0, 0, 0, .26);
+  --rotulo-4: rgba(0, 0, 0, .1);
+
+  --fundo-janela: #ececee;
+  --fundo-conteudo: #ffffff;
+  --fundo-agrupado: #f5f5f7;
+  --fundo-realce: rgba(0, 0, 0, .04);
+  --fundo-campo: #ffffff;
+
+  --separador: rgba(0, 0, 0, .11);
+  --hairline: rgba(0, 0, 0, .13);
+
+  --vidro: rgba(246, 246, 248, .72);
+  --vidro-forte: rgba(250, 250, 252, .93);
+  --vidro-borda: rgba(255, 255, 255, .6);
+
+  --sombra-1: 0 0 0 .5px rgba(0, 0, 0, .07), 0 1px 2px rgba(0, 0, 0, .06);
+  --sombra-2: 0 0 0 .5px rgba(0, 0, 0, .06), 0 2px 6px rgba(0, 0, 0, .07),
+              0 12px 32px rgba(0, 0, 0, .09);
+  --sombra-folha: 0 0 0 .5px rgba(0, 0, 0, .1), 0 24px 68px rgba(0, 0, 0, .28);
+  --anel-foco: 0 0 0 3.5px rgba(0, 122, 255, .35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --azul: #0a84ff;      --azul-forte: #409cff;
+    --vermelho: #ff453a;  --verde: #30d158;
+    --laranja: #ff9f0a;   --amarelo: #ffd60a;
+
+    --rotulo: rgba(255, 255, 255, .87);
+    --rotulo-2: rgba(255, 255, 255, .55);
+    --rotulo-3: rgba(255, 255, 255, .28);
+    --rotulo-4: rgba(255, 255, 255, .12);
+
+    --fundo-janela: #1c1c1e;
+    --fundo-conteudo: #1e1e20;
+    --fundo-agrupado: #242426;
+    --fundo-realce: rgba(255, 255, 255, .06);
+    --fundo-campo: rgba(255, 255, 255, .07);
+
+    --separador: rgba(255, 255, 255, .13);
+    --hairline: rgba(255, 255, 255, .16);
+
+    --vidro: rgba(38, 38, 40, .72);
+    --vidro-forte: rgba(44, 44, 46, .93);
+    --vidro-borda: rgba(255, 255, 255, .1);
+
+    --sombra-1: 0 0 0 .5px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .4);
+    --sombra-2: 0 0 0 .5px rgba(0, 0, 0, .5), 0 2px 6px rgba(0, 0, 0, .4),
+                0 12px 32px rgba(0, 0, 0, .5);
+    --sombra-folha: 0 0 0 .5px rgba(255, 255, 255, .12), 0 24px 68px rgba(0, 0, 0, .7);
+    --anel-foco: 0 0 0 3.5px rgba(10, 132, 255, .4);
+  }
+}
+
+/* ─── 2. base ───────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* `hidden` tem que vencer sempre. Qualquer regra com `display: flex` deste
+   arquivo sobrepõe o padrão do navegador e faz o elemento reaparecer — foi
+   assim que a caixa de busca e o botão de cotações apareceram na tela em que
+   ainda não há planilha escolhida. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;  /* a janela não rola; quem rola é a lista */
+}
+
+body {
+  font-family: var(--fonte);
+  font-size: var(--t-corpo);
+  line-height: 1.45;
+  color: var(--rotulo);
+  background: var(--fundo-janela);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* seleção acidental de texto ao arrastar deixa a janela com cara de página
+     web; o conteúdo que importa libera de volta, logo abaixo */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input, textarea, [contenteditable], .selecionavel, .memoria {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+h1, h2, h3, p { margin: 0; }
+
+/* números sempre tabulares: é o que impede a coluna de preço de dançar
+   quando um valor muda de 9 para 10 */
+.numero, .valor, td, .custo-valor {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* cantos contínuos de verdade onde o navegador já sabe fazer — o `border-radius`
+   circular é a aproximação, o superelipse é a curva que a Apple usa */
+@supports (corner-shape: superellipse(2)) {
+  .lateral, .folha, .cartao-planilha, .linha, .inspetor-bloco, .botao,
+  .acoes, .ferramentas, .selo, .miniatura, .campo, .segmentado {
+    corner-shape: superellipse(2);
+  }
+}
+
+/* ícones no traço do SF Symbols: 1,6px, ponta e junta redondas, sem
+   preenchimento — o mesmo peso ótico do texto ao lado */
+.glifo {
+  width: 1em; height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+/* ─── 3. janela ─────────────────────────────────────────────────────────── */
+
+.janela {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  height: 100%;
+}
+
+.janela.com-inspetor { grid-template-columns: 232px minmax(0, 1fr) 340px; }
+
+/* O inspetor só divide espaço com a lista quando sobra espaço de verdade: a
+   linha tem nove colunas e precisa de ~880px para caber sem cortar. Abaixo
+   disso ele passa a flutuar por cima, com sombra — que é o que o próprio
+   macOS faz quando a janela encolhe. O limite é a soma: 232 da lateral + 880
+   da lista + 340 do inspetor. */
+@media (max-width: 1452px) {
+  .janela.com-inspetor { grid-template-columns: 232px minmax(0, 1fr); }
+  .janela.com-inspetor .inspetor {
+    position: absolute; inset: 0 0 0 auto; width: 372px; z-index: 30;
+    box-shadow: var(--sombra-2);
+  }
+}
+
+/* ─── 4. lateral (vidro) ────────────────────────────────────────────────── */
+
+.lateral {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; overflow: hidden;
+  padding: 0 var(--e3) var(--e3);
+  background: var(--vidro);
+  -webkit-backdrop-filter: blur(42px) saturate(180%);
+  backdrop-filter: blur(42px) saturate(180%);
+  border-right: .5px solid var(--separador);
+}
+
+/* a faixa de arrasto: no macOS a janela se move pela lateral, e o semáforo
+   ocupa os primeiros 70px */
+.lateral-arraste { height: 38px; -webkit-app-region: drag; app-region: drag; flex: none; }
+
+.lateral-marca {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: 0 var(--e2) var(--e5);
+}
+.marca-icone { border-radius: 7px; }
+.marca-nome { font-size: var(--t-cabecalho); font-weight: 590; letter-spacing: -.01em; }
+.marca-versao { font-size: var(--t-nota); color: var(--rotulo-2); }
+
+.passos { display: flex; flex-direction: column; gap: 2px; }
+
+.passo {
+  display: flex; align-items: flex-start; gap: var(--e2);
+  padding: 7px var(--e2);
+  min-height: 30px;
+  border: 0; background: none; text-align: left;
+  border-radius: var(--r-p);
+  color: var(--rotulo);
+  font: inherit;
+  cursor: default;
+  transition: background var(--m-realce);
+}
+.passo:hover { background: var(--fundo-realce); }
+.passo[aria-current="true"] { background: var(--fundo-realce); }
+.passo:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+
+/* o marcador de etapa: círculo vazado que vira azul preenchido quando
+   concluído. Movimento curto, só para dizer que mudou de estado. */
+.passo-marca {
+  width: 15px; height: 15px; margin-top: 2px; flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--rotulo-3);
+  transition: background var(--m-transicao), border-color var(--m-transicao);
+  position: relative;
+}
+.passo-marca[data-estado="feito"] { background: var(--azul); border-color: var(--azul); }
+.passo-marca[data-estado="feito"]::after {
+  content: ""; position: absolute; inset: 0;
+  background: no-repeat center / 9px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.4 4.6 9 10 3.2' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.passo-marca[data-estado="agora"] { border-color: var(--azul); }
+.passo-marca[data-estado="agora"]::after {
+  content: ""; position: absolute; inset: 3.5px;
+  border-radius: 50%; background: var(--azul);
+}
+
+.passo-texto { display: flex; flex-direction: column; min-width: 0; }
+.passo-titulo { font-size: var(--t-corpo); font-weight: 510; letter-spacing: -.005em; }
+.passo-detalhe {
+  font-size: var(--t-nota); color: var(--rotulo-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.lateral-rodape { margin-top: auto; padding-top: var(--e4); }
+
+.cartao-planilha {
+  display: flex; align-items: center; gap: var(--e2);
+  width: 100%; padding: var(--e2);
+  border: .5px solid var(--hairline);
+  border-radius: var(--r-m);
+  background: var(--fundo-conteudo);
+  color: inherit; font: inherit; text-align: left;
+  cursor: default;
+  transition: background var(--m-realce), transform var(--m-realce);
+  box-shadow: var(--sombra-1);
+}
+.cartao-planilha:hover { background: var(--fundo-agrupado); }
+.cartao-planilha:active { transform: scale(.985); }
+.cartao-planilha:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.cartao-icone { font-size: 19px; color: var(--verde); display: flex; }
+.cartao-texto { min-width: 0; }
+.cartao-titulo {
+  display: block; font-size: var(--t-legenda); font-weight: 550;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cartao-detalhe {
+  display: block; font-size: var(--t-nota); color: var(--rotulo-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ─── 5. conteúdo e barra de ferramentas ────────────────────────────────── */
+
+.conteudo {
+  position: relative;
+  display: flex; flex-direction: column;
+  /* `min-height: 0` não é enfeite: sem ele, o item de flex se recusa a
+     encolher abaixo do conteúdo, a coluna cresce com a lista inteira e a
+     barra de ações flutuante vai parar mil pixels abaixo da janela. */
+  min-width: 0; min-height: 0;
+  overflow: hidden;
+  background: var(--fundo-conteudo);
+}
+
+/* barra unificada: sem borda enquanto a lista está no topo, hairline quando
+   há conteúdo passando por baixo. É assim que o macOS sinaliza rolagem. */
+.ferramentas {
+  position: relative; z-index: 10;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: var(--e4);
+  padding: var(--e2) var(--e5) var(--e3);
+  padding-top: 38px;              /* espaço do semáforo da janela */
+  background: var(--vidro);
+  -webkit-backdrop-filter: blur(42px) saturate(180%);
+  backdrop-filter: blur(42px) saturate(180%);
+  border-bottom: .5px solid transparent;
+  transition: border-color var(--m-transicao);
+  -webkit-app-region: drag; app-region: drag;
+}
+.ferramentas.rolou { border-bottom-color: var(--separador); }
+.ferramentas button, .ferramentas input { -webkit-app-region: no-drag; app-region: no-drag; }
+
+.ferramentas h1 {
+  font-size: var(--t-titulo-grande); font-weight: 700; letter-spacing: -.022em;
+}
+.ferramentas p { font-size: var(--t-legenda); color: var(--rotulo-2); margin-top: 1px; }
+.ferramentas-acoes { display: flex; align-items: center; gap: var(--e2); padding-bottom: 3px; }
+
+.busca {
+  display: flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 var(--e2);
+  border-radius: var(--r-capsula);
+  background: var(--fundo-campo);
+  border: .5px solid var(--hairline);
+  transition: box-shadow var(--m-realce), width var(--m-transicao);
+}
+.busca:focus-within { box-shadow: var(--anel-foco); }
+.busca-glifo { font-size: 13px; color: var(--rotulo-2); }
+.busca input {
+  width: 140px; border: 0; background: none; outline: none;
+  font: inherit; font-size: var(--t-legenda); color: inherit;
+}
+.busca input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+/* ─── 6. botões ─────────────────────────────────────────────────────────── */
+
+.botao {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 28px; padding: 0 var(--e3);
+  border: .5px solid var(--hairline);
+  border-radius: var(--r-capsula);
+  background: var(--fundo-conteudo);
+  box-shadow: var(--sombra-1);
+  color: var(--rotulo);
+  font: inherit; font-size: var(--t-legenda); font-weight: 510;
+  cursor: default; white-space: nowrap;
+  transition: background var(--m-realce), transform var(--m-realce), opacity var(--m-realce);
+}
+.botao:hover { background: var(--fundo-agrupado); }
+.botao:active { transform: scale(.97); }
+.botao:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.botao[disabled] { opacity: .4; pointer-events: none; }
+.botao .glifo { font-size: 14px; }
+
+.botao-principal {
+  background: var(--azul); border-color: transparent; color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .16);
+}
+.botao-principal:hover { background: var(--azul-forte); }
+
+.botao-simples {
+  border: 0; background: none; box-shadow: none;
+  color: var(--azul); padding: 0 var(--e1);
+}
+.botao-simples:hover { background: var(--fundo-realce); }
+
+.botao-perigo { color: var(--vermelho); }
+
+.botao-redondo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0;
+  border: 0; border-radius: 50%;
+  background: var(--fundo-realce); color: var(--rotulo-2);
+  font-size: 15px; cursor: default;
+  transition: background var(--m-realce), color var(--m-realce);
+}
+.botao-redondo:hover { background: var(--rotulo-4); color: var(--rotulo); }
+.botao-redondo:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+
+/* ─── 7. lista de candidatos ────────────────────────────────────────────── */
+
+.rolagem { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.rolagem::-webkit-scrollbar { width: 11px; }
+.rolagem::-webkit-scrollbar-thumb {
+  background: var(--rotulo-3); border-radius: var(--r-capsula);
+  border: 3px solid transparent; background-clip: content-box;
+}
+.rolagem::-webkit-scrollbar-thumb:hover { background: var(--rotulo-2); background-clip: content-box; }
+
+.lista { padding: var(--e2) var(--e5) 96px; display: flex; flex-direction: column; gap: 6px; }
+
+.grupo-arquivo {
+  display: flex; align-items: center; gap: var(--e2);
+  padding: var(--e4) var(--e1) var(--e2);
+  font-size: var(--t-legenda); font-weight: 590; color: var(--rotulo-2);
+  letter-spacing: .01em;
+}
+.grupo-arquivo::after { content: ""; flex: 1; height: .5px; background: var(--separador); }
+
+/* a linha é CONTEÚDO: opaca, sólida, sem vidro. É a regra que separa o que
+   se lê do que se opera. */
+/* uma grade só, usada pelo cabeçalho e por cada linha — mudar a largura de
+   uma coluna aqui move as duas juntas, que é a única forma de elas não
+   desalinharem com o tempo */
+.linha, .cabecalho-lista {
+  display: grid;
+  grid-template-columns: 22px 56px minmax(190px, 1fr) 84px 70px 104px 134px 96px 26px;
+  align-items: center; gap: var(--e3);
+}
+
+.cabecalho-lista {
+  position: sticky; top: 0; z-index: 5;
+  padding: var(--e2) var(--e8) 6px;
+  background: var(--fundo-conteudo);
+  border-bottom: .5px solid var(--separador);
+  font-size: var(--t-nota); font-weight: 590; color: var(--rotulo-3);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.cabecalho-lista[hidden] { display: none; }
+.cabecalho-lista .direita { text-align: left; }
+
+.linha {
+  padding: var(--e2) var(--e3);
+  border: .5px solid var(--hairline);
+  border-radius: var(--r-m);
+  background: var(--fundo-conteudo);
+  transition: background var(--m-realce), border-color var(--m-realce),
+              box-shadow var(--m-realce), transform var(--m-realce);
+}
+.linha:hover { background: var(--fundo-realce); }
+.linha.marcada {
+  border-color: rgba(0, 122, 255, .35);
+  background: color-mix(in srgb, var(--azul) 6%, var(--fundo-conteudo));
+}
+.linha.ativa { box-shadow: var(--anel-foco); }
+.linha.oculta { display: none; }
+
+@media (prefers-color-scheme: dark) {
+  .linha.marcada { border-color: rgba(10, 132, 255, .45); }
+}
+
+/* caixa de seleção do macOS: quadrado de cantos contínuos que enche de azul */
+.caixa {
+  appearance: none; -webkit-appearance: none;
+  width: 17px; height: 17px; margin: 0;
+  border: 1.5px solid var(--rotulo-3);
+  border-radius: 5px;
+  background: var(--fundo-campo);
+  cursor: default;
+  transition: background var(--m-realce), border-color var(--m-realce);
+  position: relative;
+}
+.caixa:checked { background: var(--azul); border-color: var(--azul); }
+.caixa:checked::after {
+  content: ""; position: absolute; inset: 0;
+  background: no-repeat center / 11px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.3 4.6 8.9 10 3.1' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.caixa:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+
+.miniatura {
+  width: 56px; height: 56px;
+  border-radius: var(--r-p);
+  background: var(--fundo-agrupado);
+  border: .5px solid var(--hairline);
+  object-fit: contain;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--rotulo-3); font-size: 20px;
+  overflow: hidden;
+}
+
+.identidade { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+/* o nome é editável no lugar: é o campo que a pessoa mais mexe, e mandar ela
+   abrir um painel para trocar uma palavra é atrito puro */
+.nome {
+  font-size: var(--t-corpo); font-weight: 550; letter-spacing: -.005em;
+  border: 0; background: none; outline: none;
+  padding: 2px 5px; margin: -2px -5px;
+  border-radius: 5px; color: inherit; font-family: inherit;
+  width: 100%; min-width: 0;
+  transition: background var(--m-realce), box-shadow var(--m-realce);
+}
+.nome:hover { background: var(--fundo-realce); }
+.nome:focus { background: var(--fundo-campo); box-shadow: var(--anel-foco); }
+
+.subtexto {
+  font-size: var(--t-nota); color: var(--rotulo-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.coluna { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.coluna-rotulo {
+  font-size: var(--t-nota); color: var(--rotulo-3);
+  text-transform: uppercase; letter-spacing: .05em; font-weight: 590;
+}
+.coluna-valor { font-size: var(--t-corpo); font-variant-numeric: tabular-nums; }
+.coluna-valor.ausente { color: var(--rotulo-3); }
+
+.campo {
+  height: 24px; padding: 0 var(--e2);
+  border: .5px solid var(--hairline);
+  border-radius: var(--r-p);
+  background: var(--fundo-campo);
+  font: inherit; font-size: var(--t-legenda); color: inherit;
+  outline: none; width: 100%;
+  font-variant-numeric: tabular-nums;
+  transition: box-shadow var(--m-realce);
+}
+.campo:focus { box-shadow: var(--anel-foco); }
+.campo::placeholder { color: var(--rotulo-3); }
+
+/* controle segmentado do macOS: a cápsula desliza, não pisca */
+.segmentado {
+  display: inline-flex; position: relative;
+  padding: 2px; gap: 2px;
+  background: var(--fundo-campo);
+  border: .5px solid var(--hairline);
+  border-radius: var(--r-p);
+  height: 24px;
+}
+.segmentado button {
+  position: relative; z-index: 1;
+  flex: 1; min-width: 58px;
+  border: 0; background: none;
+  font: inherit; font-size: var(--t-nota); font-weight: 550;
+  color: var(--rotulo-2); cursor: default;
+  border-radius: 5px;
+  transition: color var(--m-realce);
+  white-space: nowrap;
+}
+.segmentado button[aria-pressed="true"] { color: var(--rotulo); }
+.segmentado:focus-within { box-shadow: var(--anel-foco); }
+.segmentado-pilula {
+  position: absolute; top: 2px; bottom: 2px; left: 2px;
+  border-radius: 5px;
+  background: var(--fundo-conteudo);
+  box-shadow: var(--sombra-1);
+  transition: transform var(--m-transicao), width var(--m-transicao), opacity var(--m-realce);
+  opacity: 0;
+  pointer-events: none;
+}
+.segmentado.escolhido .segmentado-pilula { opacity: 1; }
+
+/* o selo de aviso: cor + símbolo + texto, nunca cor sozinha (acessibilidade) */
+.selo {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 18px; padding: 0 7px;
+  border-radius: var(--r-capsula);
+  font-size: var(--t-nota); font-weight: 550;
+  background: color-mix(in srgb, var(--laranja) 15%, transparent);
+  color: color-mix(in srgb, var(--laranja) 82%, var(--rotulo));
+}
+.selo.grave { background: color-mix(in srgb, var(--vermelho) 15%, transparent);
+              color: color-mix(in srgb, var(--vermelho) 82%, var(--rotulo)); }
+.selo.bom { background: color-mix(in srgb, var(--verde) 16%, transparent);
+            color: color-mix(in srgb, var(--verde) 70%, var(--rotulo)); }
+.selo.neutro { background: var(--fundo-realce); color: var(--rotulo-2); }
+
+.cel-selo { align-items: flex-start; justify-content: center; }
+
+.linha-detalhe {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border: 0; border-radius: 50%;
+  background: none; color: var(--rotulo-3); cursor: default;
+  font-size: 15px;
+  transition: background var(--m-realce), color var(--m-realce);
+}
+.linha:hover .linha-detalhe { color: var(--rotulo-2); }
+.linha-detalhe:hover { background: var(--fundo-realce); color: var(--azul); }
+
+/* ─── 8. estado vazio ───────────────────────────────────────────────────── */
+
+.vazio {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--e3); text-align: center;
+  padding: var(--e10) var(--e6) 15vh;
+  min-height: 60vh;
+}
+.vazio[hidden] { display: none; }
+.vazio-glifo { font-size: 46px; color: var(--rotulo-3); line-height: 1; }
+.vazio h2 { font-size: var(--t-titulo); font-weight: 650; letter-spacing: -.015em; }
+.vazio p { font-size: var(--t-corpo); color: var(--rotulo-2); max-width: 42ch; }
+.vazio-acoes { display: flex; gap: var(--e2); margin-top: var(--e2); }
+
+/* ─── 9. barra de ações flutuante (vidro sobre o conteúdo) ──────────────── */
+
+.acoes {
+  position: absolute; left: 50%; bottom: var(--e5);
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--e4);
+  padding: var(--e2) var(--e2) var(--e2) var(--e5);
+  border-radius: var(--r-capsula);
+  background: var(--vidro-forte);
+  -webkit-backdrop-filter: blur(42px) saturate(180%);
+  backdrop-filter: blur(42px) saturate(180%);
+  border: .5px solid var(--vidro-borda);
+  box-shadow: var(--sombra-2);
+  z-index: 20;
+  animation: subir var(--m-transicao) both;
+}
+.acoes[hidden] { display: none; }
+.acoes-resumo { font-size: var(--t-legenda); color: var(--rotulo-2); white-space: nowrap; }
+.acoes-resumo strong { color: var(--rotulo); font-weight: 590; }
+.acoes-botoes { display: flex; gap: 6px; }
+
+@keyframes subir {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ─── 10. inspetor ──────────────────────────────────────────────────────── */
+
+.inspetor {
+  display: flex; flex-direction: column;
+  min-height: 0; overflow: hidden;
+  background: var(--vidro);
+  -webkit-backdrop-filter: blur(42px) saturate(180%);
+  backdrop-filter: blur(42px) saturate(180%);
+  border-left: .5px solid var(--separador);
+  min-width: 0;
+}
+.inspetor[hidden] { display: none; }
+.inspetor-topo {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 38px var(--e4) var(--e3);
+  -webkit-app-region: drag; app-region: drag;
+}
+.inspetor-topo button { -webkit-app-region: no-drag; app-region: no-drag; }
+.inspetor-topo h2 {
+  font-size: var(--t-titulo-secao); font-weight: 650; letter-spacing: -.012em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.inspetor-corpo {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 0 var(--e4) var(--e6);
+  display: flex; flex-direction: column; gap: var(--e3);
+}
+
+.inspetor-bloco {
+  background: var(--fundo-conteudo);
+  border: .5px solid var(--hairline);
+  border-radius: var(--r-m);
+  padding: var(--e3);
+  box-shadow: var(--sombra-1);
+}
+.inspetor-bloco h3 {
+  font-size: var(--t-nota); font-weight: 650; color: var(--rotulo-2);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: var(--e2);
+}
+
+.par {
+  display: flex; justify-content: space-between; gap: var(--e3);
+  padding: 3px 0; font-size: var(--t-legenda);
+  border-top: .5px solid var(--separador);
+}
+.par:first-of-type { border-top: 0; }
+.par dt { color: var(--rotulo-2); }
+.par dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.par.destaque dd { font-weight: 650; font-size: var(--t-corpo); }
+
+.memoria {
+  font-family: var(--fonte-numero); font-size: 10.5px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+  color: var(--rotulo-2);
+  max-height: 260px; overflow: auto;
+}
+
+.lista-marcadores { margin: 0; padding-left: 1.1em; font-size: var(--t-legenda); }
+.lista-marcadores li { margin: 3px 0; color: var(--rotulo-2); }
+.lista-marcadores li::marker { color: var(--laranja); }
+
+/* ─── 11. folhas (alerta, progresso, resultado) ─────────────────────────── */
+
+.fundo-folha {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--e6);
+  background: rgba(0, 0, 0, .28);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: aparecer var(--m-transicao) both;
+}
+.fundo-folha[hidden] { display: none; }
+
+.folha {
+  width: min(520px, 100%);
+  max-height: 84vh; overflow: auto;
+  padding: var(--e6);
+  border-radius: var(--r-g);
+  background: var(--vidro-forte);
+  -webkit-backdrop-filter: blur(52px) saturate(180%);
+  backdrop-filter: blur(52px) saturate(180%);
+  border: .5px solid var(--vidro-borda);
+  box-shadow: var(--sombra-folha);
+  animation: folha-entra var(--m-folha) both;
+  text-align: center;
+}
+.folha.larga { width: min(680px, 100%); text-align: left; }
+
+.folha-glifo { font-size: 40px; line-height: 1; margin-bottom: var(--e3); }
+.folha h2 {
+  font-size: var(--t-titulo); font-weight: 650; letter-spacing: -.015em;
+  margin-bottom: var(--e2);
+}
+.folha p { font-size: var(--t-corpo); color: var(--rotulo-2); }
+.folha-botoes {
+  display: flex; gap: var(--e2); justify-content: center; flex-wrap: wrap;
+  margin-top: var(--e5);
+}
+.folha.larga .folha-botoes { justify-content: flex-end; }
+.folha-corpo { margin-top: var(--e4); text-align: left; }
+
+@keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes folha-entra {
+  from { opacity: 0; transform: scale(.94) translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* o girador: um arco que gira, do jeito do sistema */
+.girador {
+  width: 22px; height: 22px; margin: 0 auto var(--e3);
+  border-radius: 50%;
+  border: 2.5px solid var(--rotulo-4);
+  border-top-color: var(--azul);
+  animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+.tabela-gravados {
+  width: 100%; border-collapse: collapse; font-size: var(--t-legenda);
+  margin-top: var(--e2);
+}
+.tabela-gravados th {
+  text-align: left; font-weight: 590; color: var(--rotulo-2);
+  font-size: var(--t-nota); text-transform: uppercase; letter-spacing: .05em;
+  padding-bottom: var(--e1);
+}
+.tabela-gravados td { padding: 5px 0; border-top: .5px solid var(--separador); }
+.tabela-gravados td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ─── 12. brinde (aviso passageiro no rodapé) ───────────────────────────── */
+
+.brinde {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  z-index: 200;
+  display: flex; align-items: center; gap: var(--e2);
+  max-width: min(560px, 90vw);
+  padding: var(--e2) var(--e4);
+  border-radius: var(--r-capsula);
+  background: var(--vidro-forte);
+  -webkit-backdrop-filter: blur(42px) saturate(180%);
+  backdrop-filter: blur(42px) saturate(180%);
+  border: .5px solid var(--vidro-borda);
+  box-shadow: var(--sombra-2);
+  font-size: var(--t-legenda);
+  animation: subir var(--m-transicao) both;
+}
+.brinde[hidden] { display: none; }
+.brinde .glifo { font-size: 15px; }
+.brinde.erro .glifo { color: var(--vermelho); }
+.brinde.aviso .glifo { color: var(--laranja); }
+.brinde.ok .glifo { color: var(--verde); }
+
+/* ─── 13. acessibilidade: as três chaves do sistema ─────────────────────── */
+
+/* menos movimento — some a mola, fica o corte */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* menos transparência — o vidro vira sólido, como o próprio sistema faz */
+@media (prefers-reduced-transparency: reduce) {
+  .lateral, .ferramentas, .acoes, .inspetor, .folha, .brinde {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--fundo-agrupado);
+  }
+}
+
+/* mais contraste — borda visível em tudo que era só sombra */
+@media (prefers-contrast: more) {
+  :root { --hairline: var(--rotulo-2); --separador: var(--rotulo-2); }
+  .botao, .linha, .campo, .inspetor-bloco { border-width: 1px; }
+}
+
+/* navegador sem `backdrop-filter`: sem isto o cromo fica transparente de
+   verdade e o texto some por cima do conteúdo */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lateral, .ferramentas, .acoes, .inspetor, .folha, .brinde {
+    background: var(--fundo-agrupado);
+  }
+}

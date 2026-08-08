@@ -7,6 +7,65 @@ foto, e lança na planilha NPD os que você escolher — com preço, m³, custo
 estimado e as fórmulas já ligadas. O que ela **não** faz é decidir: as notas
 de 0 a 5 continuam sendo suas.
 
+Há três jeitos de usar, e todos fazem exatamente a mesma coisa por baixo.
+Escolha um:
+
+| Você recebeu | Vá para |
+|---|---|
+| um programa com ícone azul de funil | **O aplicativo**, logo abaixo |
+| uma pasta com três atalhos numerados | *Se você recebeu a pasta pronta* |
+| nada disso, e usa terminal | *Se você usa o terminal* |
+
+---
+
+## O aplicativo (o jeito mais simples)
+
+### Instalar
+
+**Windows.** Dois cliques em `Instalar Ferramenta NPD.exe`, avançar até o fim.
+Na primeira vez o Windows mostra "O Windows protegeu o seu computador" — é o
+aviso de programa sem certificado, não é vírus. Clique em **Mais informações →
+Executar assim mesmo**. Depois disso o atalho fica na área de trabalho.
+
+**Mac.** Abra o `Ferramenta-NPD-Mac-Apple-Silicon.dmg` e arraste o ícone para a
+pasta **Aplicativos**. Na primeira abertura o Mac vai dizer que não conseguiu
+verificar o desenvolvedor — pelo mesmo motivo. Vá em **menu Apple → Ajustes do
+Sistema → Privacidade e Segurança**, role até o fim e clique em **Abrir Assim
+Mesmo**. Uma vez só; depois abre normal.
+
+### Usar
+
+A janela guia por quatro etapas, que aparecem na coluna da esquerda:
+
+1. **Planilha NPD** — clique no cartão de baixo e escolha o arquivo `.xlsx` da
+   NPD. O programa lembra dela na próxima vez, então isto é só na primeira.
+2. **Cotações** — *Adicionar cotações* abre o seletor de arquivos. Pode marcar
+   vários de uma vez, ou escolher uma pasta inteira. Os produtos aparecem numa
+   lista com foto, fornecedor, preço em dólar e m³ por unidade.
+3. **Conferir custo** — marque com a caixinha os produtos que quer levar,
+   preencha o **NCM** e escolha a **marca** (Marchesoni ou MarcPro). Clique em
+   *Conferir custo*: a coluna do NCM vira o custo em reais. A seta no fim de
+   cada linha abre o painel com a memória de cálculo inteira — imposto por
+   imposto — e o que ficou pendente.
+4. **Gravar no funil** — confirma e escreve. Aparece a lista do que entrou, em
+   que linha do Funil e da Priorizacao, com botões para abrir a planilha, o
+   relatório ou a pasta do backup.
+
+Alguns detalhes que economizam perguntas:
+
+- **O nome do produto se edita na própria linha.** Clique nele e digite. É o
+  nome que vai para a planilha, e ele é o vínculo entre o Funil e a Priorizacao.
+- **Nada é gravado antes do passo 4.** Marcar, digitar NCM e conferir custo não
+  encostam na planilha.
+- **Toda gravação faz backup antes**, numa pasta `backups` ao lado da planilha.
+- **Feche a planilha no Excel antes de gravar.** Com o arquivo aberto, o Windows
+  não deixa escrever — o programa avisa e não perde o que você marcou.
+- **Campo vazio é ausência de dado, não erro.** Um traço na coluna de m³ quer
+  dizer que a cotação não trouxe o volume; o selo cinza no fim da linha conta o
+  que a leitura achou estranho, e o painel de detalhes lista item por item.
+- **O programa não manda nada para a internet.** Preço, custo e fornecedor não
+  saem do seu computador.
+
 ---
 
 ## Se você recebeu a pasta pronta (clicando)

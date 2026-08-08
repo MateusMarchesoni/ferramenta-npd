@@ -10,6 +10,10 @@ relatorios/
 # build
 dist/
 build/
+dist-app/
+build-app/
+dist-instalador/
+distribuir/icone/icone.iconset/
 *.egg-info/
 __pycache__/
 *.py[cod]

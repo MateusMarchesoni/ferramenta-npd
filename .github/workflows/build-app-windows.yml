@@ -1,0 +1,82 @@
+# Monta o aplicativo de Windows — o de janela, com instalador de um clique.
+#
+# Existe numa máquina Windows porque o PyInstaller não faz build cruzado, e o
+# instalador (Inno Setup) também só roda lá. Como o desenvolvimento acontece
+# num Mac, o GitHub empresta a máquina.
+#
+# Saem dois arquivos, e os dois têm uso:
+#   Instalar Ferramenta NPD.exe   o caminho normal: instala e cria os atalhos
+#   Ferramenta NPD.exe            o portátil: roda de pen drive, sem instalar
+#
+# Baixe em Actions -> a execução -> Artifacts.
+name: Aplicativo Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar a ferramenta, a janela e o PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[app]"
+          pip install pyinstaller
+
+      - name: Montar o aplicativo
+        run: pyinstaller --clean --noconfirm --distpath dist-app distribuir/npd-app.spec
+
+      # O executável é "sem console" — é um programa de janela. Isso significa
+      # que ele não tem para onde escrever, então a conferência sai em arquivo,
+      # e é o arquivo que a montagem lê. Sem `-Wait`, o PowerShell segue em
+      # frente antes de o programa terminar e a conferência não confere nada.
+      - name: Conferir que a cópia está completa
+        shell: pwsh
+        run: |
+          $processo = Start-Process -FilePath "dist-app\Ferramenta NPD.exe" `
+            -ArgumentList "--conferir","--relatorio","conferencia.txt" `
+            -Wait -PassThru -NoNewWindow
+          if (Test-Path conferencia.txt) { Get-Content conferencia.txt }
+          if ($processo.ExitCode -ne 0) {
+            Write-Output "::error::esta cópia está incompleta — veja a conferência acima"
+            exit 1
+          }
+
+      - name: Instalar o Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Montar o instalador
+        shell: pwsh
+        run: |
+          $fonte = Get-Content src\npd_tool\__init__.py -Raw
+          $versao = [regex]::Match($fonte, '__version__ = "([^"]+)"').Groups[1].Value
+          Write-Output "versão $versao"
+          & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" /DVersao=$versao distribuir\windows\instalador.iss
+
+      - name: Conferir que o instalador saiu
+        shell: pwsh
+        run: |
+          $arquivos = Get-ChildItem dist-instalador\*.exe
+          if (-not $arquivos) {
+            Write-Output "::error::o Inno Setup não gerou instalador"
+            exit 1
+          }
+          $arquivos | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ferramenta-NPD-App-Windows
+          path: |
+            dist-instalador/*.exe
+            dist-app/Ferramenta NPD.exe
+          if-no-files-found: error

@@ -1,0 +1,43 @@
+FERRAMENTA NPD — INSTALAÇÃO NO MAC
+
+1. Arraste o ícone "Ferramenta NPD" para a pasta "Aplicativos", aqui do lado.
+2. Feche esta janela e ejete o disco (o ícone que apareceu na Mesa).
+3. Abra o Launchpad e clique em "Ferramenta NPD".
+
+
+NA PRIMEIRA VEZ, O MAC VAI DESCONFIAR
+
+Você vai ver algo como "não foi possível verificar o desenvolvedor" ou "o
+aplicativo não pôde ser aberto". Isso não é defeito nem vírus: é o macOS
+avisando que este programa não foi registrado na Apple — o registro custa uma
+assinatura anual, e esta é uma ferramenta interna da empresa.
+
+Para liberar, uma vez só:
+
+  1. Clique em OK / Concluído para fechar o aviso.
+  2. Abra o menu Apple > Ajustes do Sistema > Privacidade e Segurança.
+  3. Role até o fim. Vai haver uma linha dizendo que "Ferramenta NPD" foi
+     bloqueada. Clique em "Abrir Assim Mesmo".
+  4. Confirme com sua senha ou Touch ID.
+
+A partir daí ele abre com um clique, como qualquer outro programa.
+
+Se preferir resolver pelo Terminal, uma linha faz o mesmo:
+
+  xattr -dr com.apple.quarantine "/Applications/Ferramenta NPD.app"
+
+
+O QUE O PROGRAMA FAZ COM SEUS ARQUIVOS
+
+- Só grava na planilha NPD que você escolher, e sempre faz uma cópia de
+  segurança antes, numa pasta "backups" ao lado dela.
+- Não envia nada para a internet. Preço de compra, custo e fornecedor não saem
+  do seu computador.
+- Guarda uma coisa só entre uma abertura e outra: o caminho da última planilha
+  usada, para não pedir de novo.
+
+
+PRECISA DE UM MAC COM CHIP APPLE (M1, M2, M3, M4…)
+
+Veja em menu Apple > Sobre Este Mac. Se aparecer "Intel", este pacote não
+serve — peça a versão de terminal, que tem build para Intel.

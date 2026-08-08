@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ferramenta NPD</title>
+<!-- O token da sessão vem por meta, não pela URL: URL vai parar no histórico
+     do navegador e no log de qualquer coisa que passe no meio. -->
+<meta name="npd-token" content="{{TOKEN}}">
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" href="/icone.svg">
+</head>
+<body>
+
+<!-- ═══ estrutura de janela do macOS: lateral translúcida, conteúdo opaco,
+         inspetor à direita. O que flutua é o controle; o conteúdo manda. ═══ -->
+<div class="janela">
+
+  <aside class="lateral" id="lateral">
+    <div class="lateral-arraste"></div>
+
+    <header class="lateral-marca">
+      <img src="/icone.svg" alt="" class="marca-icone" width="30" height="30">
+      <div>
+        <div class="marca-nome">Ferramenta NPD</div>
+        <div class="marca-versao" id="versao">—</div>
+      </div>
+    </header>
+
+    <nav class="passos" id="passos" aria-label="Etapas">
+      <button class="passo" data-passo="planilha" type="button">
+        <span class="passo-marca" data-estado="pendente"></span>
+        <span class="passo-texto">
+          <span class="passo-titulo">Planilha NPD</span>
+          <span class="passo-detalhe" id="passo-planilha-detalhe">nenhuma escolhida</span>
+        </span>
+      </button>
+      <button class="passo" data-passo="cotacoes" type="button">
+        <span class="passo-marca" data-estado="pendente"></span>
+        <span class="passo-texto">
+          <span class="passo-titulo">Cotações</span>
+          <span class="passo-detalhe" id="passo-cotacoes-detalhe">nenhuma aberta</span>
+        </span>
+      </button>
+      <button class="passo" data-passo="conferir" type="button">
+        <span class="passo-marca" data-estado="pendente"></span>
+        <span class="passo-texto">
+          <span class="passo-titulo">Conferir custo</span>
+          <span class="passo-detalhe" id="passo-conferir-detalhe">nada marcado</span>
+        </span>
+      </button>
+      <button class="passo" data-passo="gravar" type="button">
+        <span class="passo-marca" data-estado="pendente"></span>
+        <span class="passo-texto">
+          <span class="passo-titulo">Gravar no funil</span>
+          <span class="passo-detalhe" id="passo-gravar-detalhe">nada gravado</span>
+        </span>
+      </button>
+    </nav>
+
+    <div class="lateral-rodape">
+      <button class="cartao-planilha" id="cartao-planilha" type="button">
+        <span class="cartao-icone" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="glifo"><path d="M6 3.5h7.5L19 9v11.5H6z"/><path d="M13.2 3.6V9H18.8"/></svg>
+        </span>
+        <span class="cartao-texto">
+          <span class="cartao-titulo" id="cartao-planilha-nome">Escolher planilha…</span>
+          <span class="cartao-detalhe" id="cartao-planilha-pasta">a NPD que vai receber os produtos</span>
+        </span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="conteudo">
+    <header class="ferramentas" id="ferramentas">
+      <div class="ferramentas-titulo">
+        <h1 id="titulo">Candidatos</h1>
+        <p id="subtitulo">Escolha a planilha NPD para começar</p>
+      </div>
+      <div class="ferramentas-acoes">
+        <div class="busca" id="caixa-busca" hidden>
+          <svg viewBox="0 0 24 24" class="glifo busca-glifo" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2"/><path d="M15.2 15.2 20 20"/></svg>
+          <input type="search" id="busca" placeholder="Buscar" aria-label="Buscar produto">
+        </div>
+        <button class="botao" id="botao-cotacoes" type="button" hidden>
+          <svg viewBox="0 0 24 24" class="glifo" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg>
+          Adicionar cotações
+        </button>
+      </div>
+    </header>
+
+    <div class="rolagem" id="rolagem">
+      <!-- o cabeçalho da tabela aparece uma vez, grudado no topo, em vez de
+           um rótulo miúdo repetido em cada uma das duzentas linhas -->
+      <div class="cabecalho-lista" id="cabecalho-lista" hidden>
+        <span></span><span></span>
+        <span>Produto</span>
+        <span class="direita">FOB USD</span>
+        <span class="direita">m³/un</span>
+        <span id="cabecalho-ncm">NCM</span>
+        <span>Marca</span>
+        <span></span><span></span>
+      </div>
+
+      <div class="lista" id="lista"></div>
+
+      <div class="vazio" id="vazio">
+        <div class="vazio-glifo" id="vazio-glifo"></div>
+        <h2 id="vazio-titulo">Nenhuma planilha escolhida</h2>
+        <p id="vazio-texto">A ferramenta lança produtos dentro da sua planilha NPD — a mesma que você abre no Excel. Escolha o arquivo para começar.</p>
+        <div class="vazio-acoes" id="vazio-acoes"></div>
+      </div>
+    </div>
+
+    <footer class="acoes" id="acoes" hidden>
+      <div class="acoes-resumo" id="acoes-resumo">nenhum produto marcado</div>
+      <div class="acoes-botoes">
+        <button class="botao" id="botao-conferir" type="button">Conferir custo</button>
+        <button class="botao botao-principal" id="botao-gravar" type="button">Gravar no funil</button>
+      </div>
+    </footer>
+  </main>
+
+  <aside class="inspetor" id="inspetor" hidden aria-label="Detalhes do produto">
+    <header class="inspetor-topo">
+      <h2 id="inspetor-titulo">Detalhes</h2>
+      <button class="botao-redondo" id="fechar-inspetor" type="button" aria-label="Fechar detalhes">
+        <svg viewBox="0 0 24 24" class="glifo"><path d="m7.8 7.8 8.4 8.4M16.2 7.8l-8.4 8.4"/></svg>
+      </button>
+    </header>
+    <div class="inspetor-corpo" id="inspetor-corpo"></div>
+  </aside>
+</div>
+
+<!-- ═══ folhas: alerta, progresso e o resultado da gravação ═══ -->
+<div class="fundo-folha" id="fundo-folha" hidden>
+  <div class="folha" id="folha" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="brinde" id="brinde" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

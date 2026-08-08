@@ -18,6 +18,10 @@ julgamento humano — as notas de 0 a 5 de cada critério.
 
 ## Em uma olhada
 
+Há um aplicativo com janela — ícone, lista com foto, custo antes de gravar — e
+os três comandos de terminal que existiam antes dele. Os dois passam pelas
+mesmas funções; o app é uma casca por cima, não um segundo programa.
+
 ```
 npd-tool abrir  cotacao.pdf     lista os produtos na aba `Candidatos`
 npd-tool conferir               calcula o custo do que foi marcado
@@ -30,14 +34,15 @@ pessoa clica nos três atalhos, na ordem.
 Pacotes prontos, sem instalar Python, em [Releases](../../releases) — e a cada
 push em **Actions → Artifacts**:
 
-| Sistema | Pacote |
-|---|---|
-| Windows | `Ferramenta-NPD-Windows` |
-| Mac com chip M1/M2/M3… | `Ferramenta-NPD-Mac-Apple-Silicon` |
-| Mac com processador Intel | `Ferramenta-NPD-Mac-Intel` |
+| Sistema | Aplicativo (janela) | Terminal |
+|---|---|---|
+| Windows | `Instalar Ferramenta NPD.exe` | `Ferramenta-NPD-Windows` |
+| Mac com chip M1/M2/M3… | `Ferramenta-NPD-Mac-Apple-Silicon.dmg` | `Ferramenta-NPD-Mac-Apple-Silicon` |
+| Mac com processador Intel | — | `Ferramenta-NPD-Mac-Intel` |
 
 O processador do Mac aparece em *menu Apple → Sobre este Mac*. O binário de
-Apple Silicon não roda em Mac Intel.
+Apple Silicon não roda em Mac Intel, e o aplicativo com janela só sai para
+Apple Silicon — em Mac Intel, use a versão de terminal.
 
 ## O que ela nunca faz
 

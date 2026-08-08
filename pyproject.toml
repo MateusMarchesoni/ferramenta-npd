@@ -9,15 +9,25 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# A janela do app. É extra, e não dependência: quem só usa o terminal não
+# precisa do WebKit nem do pyobjc, e o app cai no navegador padrão se isto
+# faltar (ver `app/janela.py`).
+app = ["pywebview>=5"]
 
 [project.scripts]
 npd-tool = "npd_tool.cli:main"
+npd-tool-app = "npd_tool.app.__main__:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "npd_tool.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# A interface do app são arquivos, não código; sem isto o `pip install` deixa
+# o pacote sem tela.
+[tool.setuptools.package-data]
+"npd_tool.app" = ["web/*"]
 
 [build-system]
 requires = ["setuptools>=68"]

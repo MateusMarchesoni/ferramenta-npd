@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Ferramenta NPD">
+  <!-- O ícone do programa.
+
+       Um símbolo só, centrado, cheio, sem texto e sem cena — que é como a
+       Apple desenha ícone de aplicativo. O símbolo é o funil, porque é
+       literalmente o que a ferramenta faz: cotação entra de um lado, produto
+       cadastrado sai do outro, na aba `Funil` da planilha.
+
+       O fundo é um quadrado de cantos contínuos (superelipse), não um
+       retângulo de cantos circulares: é a diferença que faz o ícone parecer
+       do sistema em vez de colado nele. O gradiente vai do azul do sistema
+       para o índigo, iluminado no topo — a luz vem de cima, sempre. -->
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4DA2FF"/>
+      <stop offset="0.48" stop-color="#0A84FF"/>
+      <stop offset="1" stop-color="#3B34C9"/>
+    </linearGradient>
+    <linearGradient id="brilho" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="corte">
+      <path d="M512 96C287 96 175 96 135.5 135.5 96 175 96 287 96 512s0 337 39.5 376.5S287 928 512 928s337 0 376.5-39.5S928 737 928 512s0-337-39.5-376.5S737 96 512 96z"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#corte)">
+    <rect width="1024" height="1024" fill="url(#fundo)"/>
+    <rect width="1024" height="1024" fill="url(#brilho)"/>
+  </g>
+
+  <!-- o funil: junta redonda no traço, para nenhum canto ficar afiado -->
+  <path d="M334.9 338.2 H689.1 L556.3 525.1 V672.7 L467.7 715.4 V525.1 Z"
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="24.6" stroke-linejoin="round"/>
+</svg>
