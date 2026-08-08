@@ -46,7 +46,10 @@ jobs:
           $processo = Start-Process -FilePath "dist-app\Ferramenta NPD.exe" `
             -ArgumentList "--conferir","--relatorio","conferencia.txt" `
             -Wait -PassThru -NoNewWindow
-          if (Test-Path conferencia.txt) { Get-Content conferencia.txt }
+          # `-Encoding utf8` porque o relatório sai em UTF-8 e o PowerShell lê
+          # em ANSI por padrão — sem isto, "cotação" vira "cota��o" e o log de
+          # suporte fica ilegível justo quando alguém for lê-lo
+          if (Test-Path conferencia.txt) { Get-Content conferencia.txt -Encoding utf8 }
           if ($processo.ExitCode -ne 0) {
             Write-Output "::error::esta cópia está incompleta — veja a conferência acima"
             exit 1
@@ -61,7 +64,24 @@ jobs:
           $fonte = Get-Content src\npd_tool\__init__.py -Raw
           $versao = [regex]::Match($fonte, '__version__ = "([^"]+)"').Groups[1].Value
           Write-Output "versão $versao"
-          & "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" /DVersao=$versao distribuir\windows\instalador.iss
+
+          # `"$env:ProgramFiles(x86)\..."` NÃO funciona: o PowerShell termina o
+          # nome da variável no `(` e procura por um programa chamado
+          # "C:\Program Files(x86)\...". O nome com parêntese exige chaves.
+          # E o runner do GitHub muda de imagem sem avisar, então o caminho é
+          # procurado nos dois "Program Files" e, por último, no PATH.
+          $candidatos = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidatos | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source }
+          if (-not $iscc) {
+            Write-Output "::error::não achei o ISCC.exe do Inno Setup"
+            exit 1
+          }
+          Write-Output "Inno Setup: $iscc"
+          & $iscc /DVersao=$versao distribuir\windows\instalador.iss
 
       - name: Conferir que o instalador saiu
         shell: pwsh
