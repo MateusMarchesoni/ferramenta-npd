@@ -31,6 +31,7 @@ from npd_tool.ingest.comum import (
     texto_limpo,
 )
 from npd_tool.ingest.imagens import foto_para_bbox, fotos_da_pagina
+from npd_tool.ingest.rotulos import papel_de
 from npd_tool.modelo import Embalagem, Ficha, Origem, Preco
 
 # nome normalizado do cabeçalho -> papel
@@ -82,6 +83,23 @@ def _normalizar_cabecalho(texto: str | None) -> str:
     return limpo.rstrip(":")
 
 
+# Os papéis do vocabulário compartilhado, traduzidos para os nomes que este
+# módulo usa. `PAPEIS` acima continua valendo primeiro — ele tem papéis que só
+# existem em PDF (`qty`, `amount`, `dimensoes`) e que o vocabulário geral, que
+# serve a planilhas, não precisa conhecer.
+_TRADUCAO_COMPARTILHADA = {
+    "modelo": "modelo",
+    "nome": "produto",
+    "descricao": "descricao",
+    "preco": "preco",
+    "moq": "moq",
+    "cbm": "cbm",
+    "certificado": "certificado",
+    "foto": "foto",
+    "indice": "indice",
+}
+
+
 def _ler_cabecalho(linha: list[str | None]) -> _Cabecalho | None:
     cab = _Cabecalho()
     for i, celula in enumerate(linha):
@@ -93,8 +111,22 @@ def _ler_cabecalho(linha: list[str | None]) -> _Cabecalho | None:
         if papel is None:
             chave_sem_unidade = re.sub(r"\s*\(.*?\)\s*", "", chave).strip()
             papel = PAPEIS.get(chave_sem_unidade)
+        if papel is None:
+            # o fornecedor novo escreve `Item No.` e `FOB Price`, que nunca
+            # estiveram na lista local — o vocabulário compartilhado tem as
+            # variantes que os outros parsers já aprenderam
+            papel = _TRADUCAO_COMPARTILHADA.get(papel_de(celula))
         if papel:
             cab.papel_por_indice[i] = papel
+
+    # sem coluna de modelo, o nome do produto faz as vezes de identidade: é
+    # isso ou descartar a cotação inteira, e a identidade é justamente o campo
+    # que a pessoa consegue conferir na tela
+    if cab.indice_de("modelo") is None:
+        indice_produto = cab.indice_de("produto")
+        if indice_produto is not None:
+            cab.papel_por_indice[indice_produto] = "modelo"
+
     if cab.indice_de("modelo") is None or cab.indice_de("preco") is None:
         return None
     return cab

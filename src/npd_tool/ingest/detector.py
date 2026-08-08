@@ -14,6 +14,13 @@ O que separa os dois layouts de xlsx é a **orientação dos rótulos**:
 Contar rótulos conhecidos por linha e por coluna distingue os dois sem
 depender de nenhum rótulo específico estar presente — que é o que quebrava
 quando `Model No` aparecia nos dois formatos.
+
+**Nenhum arquivo é recusado por não casar com esta lista.** O vocabulário
+(`rotulos.py`) decide qual parser é o *melhor*, não se existe algum: quando
+nada é reconhecido, a cotação vai para `xlsx_generico.py`, que lê pela forma da
+planilha e devolve fichas de confiança baixa, com aviso. Recusar o arquivo
+devolve à pessoa um problema que ela não tem como resolver; devolver o que deu
+para ler, marcado como incerto, ela confere na tela.
 """
 from __future__ import annotations
 
@@ -22,60 +29,27 @@ from typing import Callable
 
 import openpyxl
 
+from npd_tool.ingest.rotulos import PAPEIS_DE_IDENTIDADE, e_rotulo, papel_de
 from npd_tool.modelo import Ficha
 
 FormatoDesconhecido = "desconhecido"
 
-ROTULOS_MODELO = {"model no", "model no.", "model"}
-
-# vocabulário comum aos dois layouts — usado só para medir densidade
-ROTULOS_CONHECIDOS = ROTULOS_MODELO | {
-    "image",
-    "images",
-    "picture",
-    "product picture",
-    "photo",
-    "category",
-    "general specification",
-    "specification",
-    "features",
-    "quotation",
-    "description",
-    "certification",
-    "certificate",
-    "packing info",
-    "packing",
-    "delivery time",
-    "payment term",
-    "dimensions",
-    "unit price",
-    "estimate quotation",
-    "price",
-    "moq",
-    "product",
-    "net weight",
-    "gross weight",
-    "package size",
-    "unit size",
-    "no.",
-}
-
 # um cabeçalho de verdade tem mais de um rótulo; um único acerto é ruído
 MINIMO_PARA_CABECALHO = 2
+
+# A NPD tem colunas chamadas `Produto`, `Marca` e `Categoria`, que são rótulos
+# de cotação legítimos — com o vocabulário largo, ela se parece o suficiente
+# com um catálogo para ser lida como um, e despejaria trezentos "produtos" de
+# volta na lista de candidatos. Ela se identifica pelas próprias abas.
+ABAS_DA_NPD = frozenset({"Funil", "Pesos", "Priorizacao"})
 
 
 class FormatoNaoSuportado(Exception):
     pass
 
 
-def _normalizar(valor) -> str:
-    if valor is None:
-        return ""
-    return " ".join(str(valor).replace("\xa0", " ").split()).strip().lower().rstrip(":")
-
-
 def _e_rotulo(valor) -> bool:
-    return _normalizar(valor) in ROTULOS_CONHECIDOS
+    return e_rotulo(valor)
 
 
 def _densidades(ws, ate_linha: int = 15, ate_coluna: int = 30) -> tuple[int, int]:
@@ -96,9 +70,14 @@ def _densidades(ws, ate_linha: int = 15, ate_coluna: int = 30) -> tuple[int, int
 
 
 def _tem_coluna_de_modelo(ws, ate_linha: int = 15, ate_coluna: int = 30) -> bool:
+    """Uma coluna que identifica o produto — `Model No.`, `Item No.`, `Produto`.
+
+    É o que separa um catálogo (uma linha por produto) de uma ficha avulsa (um
+    produto só, com os atributos espalhados).
+    """
     for linha in range(1, min(ate_linha, ws.max_row) + 1):
         for col in range(1, min(ate_coluna, ws.max_column) + 1):
-            if _normalizar(ws.cell(row=linha, column=col).value) in ROTULOS_MODELO:
+            if papel_de(ws.cell(row=linha, column=col).value) in PAPEIS_DE_IDENTIDADE:
                 return True
     return False
 
@@ -110,13 +89,31 @@ def detectar_formato(caminho: Path) -> str:
     if sufixo == ".pdf":
         return "pdf_tabular"
 
+    if sufixo == ".xls":
+        # o .xls é um formato binário de 1997 que o openpyxl não abre. Dizer
+        # "não suportado" deixa a pessoa sem saída; dizer como converter
+        # resolve em dois cliques, e o Excel dela já faz isso.
+        raise FormatoNaoSuportado(
+            f"{caminho.name} está no formato antigo .xls, que a ferramenta não "
+            "abre. Abra o arquivo no Excel e use Arquivo → Salvar como → "
+            "Pasta de Trabalho do Excel (.xlsx); depois adicione o .xlsx aqui."
+        )
+
     if sufixo not in (".xlsx", ".xlsm"):
         raise FormatoNaoSuportado(
-            f"{caminho.name}: só .xlsx e .pdf são suportados na v1 (PLANO.md seção 2)"
+            f"{caminho.name}: a ferramenta lê cotação em .xlsx e em .pdf "
+            f"(este arquivo é {sufixo or 'sem extensão'})"
         )
 
     wb = openpyxl.load_workbook(caminho, data_only=True)
     try:
+        if ABAS_DA_NPD <= set(wb.sheetnames):
+            raise FormatoNaoSuportado(
+                f"{caminho.name} é a própria planilha NPD (tem as abas Funil, "
+                "Pesos e Priorizacao), não uma cotação de fornecedor. Escolha "
+                "os arquivos que os fornecedores enviaram."
+            )
+
         melhor_linha = melhor_coluna = 0
         tem_modelo = False
         for nome_aba in wb.sheetnames:
@@ -153,12 +150,45 @@ def _parsers() -> dict[str, Callable[[Path], list[Ficha]]]:
 
 
 def ler_cotacao(caminho: Path) -> list[Ficha]:
-    """Lê uma cotação de qualquer formato suportado e devolve as fichas."""
+    """Lê uma cotação e devolve as fichas — sem recusar layout desconhecido.
+
+    A cotação de um fornecedor novo raramente é igual às que existiam quando o
+    parser foi escrito, e a pessoa que a recebeu não tem como reformatá-la. Por
+    isso a leitura tem dois níveis: o parser específico, quando o layout é
+    reconhecido; e o genérico, que lê pela forma da planilha e marca tudo como
+    confiança baixa. Só sobra erro quando nem a forma se sustenta — e aí o erro
+    diz o que fazer.
+    """
+    caminho = Path(caminho)
     formato = detectar_formato(caminho)
     parser = _parsers().get(formato)
-    if parser is None:
+
+    fichas: list[Ficha] = []
+    if parser is not None:
+        fichas = parser(caminho)
+        if fichas:
+            return fichas
+
+    if caminho.suffix.lower() == ".pdf":
+        # o PDF já passou pelo pdf_tabular, que é o único leitor de PDF que
+        # existe: não há segundo nível para tentar
         raise FormatoNaoSuportado(
-            f"{Path(caminho).name}: formato não reconhecido — "
-            "nenhuma linha nem coluna de cabeçalho identificada"
+            f"{caminho.name}: abri o PDF mas não encontrei nenhuma tabela de "
+            "produtos nele. PDF de catálogo em imagem (página escaneada) não "
+            "tem texto para ler — nesse caso peça a versão em Excel ao "
+            "fornecedor, ou lance o produto à mão."
         )
-    return parser(Path(caminho))
+
+    from npd_tool.ingest.xlsx_generico import parse_xlsx_generico
+
+    fichas = parse_xlsx_generico(caminho)
+    if fichas:
+        return fichas
+
+    raise FormatoNaoSuportado(
+        f"{caminho.name}: abri a planilha mas não encontrei produtos nela. "
+        "A ferramenta procura uma linha ou coluna de cabeçalho (com algo como "
+        "Model/Item/Produto, Price/Preço, MOQ, Packing) e, se não achar, "
+        "procura uma tabela com códigos e preços. Confira se a cotação está na "
+        "primeira aba e se as colunas têm título."
+    )

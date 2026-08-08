@@ -30,22 +30,8 @@ from npd_tool.ingest.comum import (
     texto_limpo,
 )
 from npd_tool.ingest.imagens import fotos_por_ancora_xlsx
+from npd_tool.ingest.rotulos import normalizar as _normalizar_rotulo, papel_de
 from npd_tool.modelo import Embalagem, Ficha, Origem, Preco
-
-PAPEIS_CABECALHO = {
-    "model no": "modelo",
-    "model no.": "modelo",
-    "model": "modelo",
-    "product picture": "foto",
-    "picture": "foto",
-    "description": "descricao",
-    "certification": "certificado",
-    "certificate": "certificado",
-    "packing info": "embalagem",
-    "packing": "embalagem",
-    "delivery time": "entrega",
-    "payment term": "pagamento",
-}
 
 # um modelo não tem espaços: 'DM-B', 'HM-350-220', 'BL-4X', 'CG-300'
 _RE_MODELO = re.compile(r"^[A-Za-z0-9][A-Za-z0-9\-._/()+]*$")
@@ -82,18 +68,25 @@ class _Bloco:
 
 
 def _normalizar(texto) -> str:
-    if texto is None:
-        return ""
-    return " ".join(str(texto).replace("\xa0", " ").split()).strip().lower().rstrip(":")
+    return _normalizar_rotulo(texto)
 
 
 def _achar_cabecalho(ws, limite: int = 20) -> tuple[int, dict[str, int]] | None:
+    """A linha de cabeçalho e o que cada coluna significa.
+
+    Exige uma coluna que identifique o produto. `Product Name` serve tão bem
+    quanto `Model No.` — fornecedor que não usa código de modelo põe o nome no
+    lugar dele, e a ficha sai com o nome como identidade, que é o que o resto
+    da ferramenta espera em `Ficha.modelo`.
+    """
     for linha in range(1, min(limite, ws.max_row) + 1):
         mapa: dict[str, int] = {}
         for col in range(1, min(ws.max_column, 30) + 1):
-            papel = PAPEIS_CABECALHO.get(_normalizar(ws.cell(row=linha, column=col).value))
+            papel = papel_de(ws.cell(row=linha, column=col).value)
             if papel and papel not in mapa:
                 mapa[papel] = col
+        if "modelo" not in mapa and "nome" in mapa:
+            mapa["modelo"] = mapa["nome"]
         if "modelo" in mapa:
             return linha, mapa
     return None
@@ -295,9 +288,10 @@ def _parse_aba_blocos(
 
 
 def _grupos_de_colunas(ws, linha_cabecalho: int) -> list[int]:
+    """As colunas de identidade repetidas — o layout de N grupos lado a lado."""
     colunas = []
     for col in range(1, ws.max_column + 1):
-        if _normalizar(ws.cell(row=linha_cabecalho, column=col).value) in ("model no", "model no.", "model"):
+        if papel_de(ws.cell(row=linha_cabecalho, column=col).value) == "modelo":
             colunas.append(col)
     return colunas
 
