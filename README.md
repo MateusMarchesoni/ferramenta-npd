@@ -8,6 +8,27 @@ O gargalo que ela resolve não é a decisão: é a transcrição. O objetivo é 
 gestor abra a planilha e encontre o produto já cadastrado, faltando apenas o
 julgamento humano — as notas de 0 a 5 de cada critério.
 
+## Baixar o programa
+
+**[Releases](../../releases/latest)** — é o único lugar onde os pacotes prontos
+ficam. Baixe o arquivo do seu sistema e clique nele:
+
+| Seu computador | Baixe |
+|---|---|
+| Windows 10 ou 11 | `Instalar-Ferramenta-NPD.exe` |
+| Mac com chip M1/M2/M3/M4 | `Ferramenta-NPD-Mac-Apple-Silicon.dmg` |
+
+Não precisa instalar Python nem nada antes. Na primeira abertura os dois
+sistemas vão avisar que o programa não tem certificado — o
+[`COMO-USAR.md`](COMO-USAR.md) explica os dois cliques que liberam.
+
+> **Não confunda com a aba Actions.** O que aparece lá em *Artifacts* é o
+> resultado de cada montagem: expira em 90 dias e baixa embrulhado num zip a
+> mais. Serve para conferir uma montagem específica, não para instalar.
+
+Quem prefere terminal encontra na mesma release os pacotes `Ferramenta-NPD-*`,
+incluindo o de Mac Intel — que é o único sistema sem versão de janela.
+
 ## Por onde começar
 
 | Você é | Leia |
@@ -30,15 +51,6 @@ npd-tool gravar                 lança no Funil e na Priorizacao
 
 Ou, sem digitar nada: os arquivos de cotação vão para a pasta `cotações/` e a
 pessoa clica nos três atalhos, na ordem.
-
-Pacotes prontos, sem instalar Python, em [Releases](../../releases) — e a cada
-push em **Actions → Artifacts**:
-
-| Sistema | Aplicativo (janela) | Terminal |
-|---|---|---|
-| Windows | `Instalar Ferramenta NPD.exe` | `Ferramenta-NPD-Windows` |
-| Mac com chip M1/M2/M3… | `Ferramenta-NPD-Mac-Apple-Silicon.dmg` | `Ferramenta-NPD-Mac-Apple-Silicon` |
-| Mac com processador Intel | — | `Ferramenta-NPD-Mac-Intel` |
 
 O processador do Mac aparece em *menu Apple → Sobre este Mac*. O binário de
 Apple Silicon não roda em Mac Intel, e o aplicativo com janela só sai para

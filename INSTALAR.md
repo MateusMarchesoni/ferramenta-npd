@@ -106,8 +106,26 @@ se entrega hoje para quem só quer cadastrar produto.
 | Windows 10/11 | `Instalar Ferramenta NPD.exe` | dois cliques, avançar, pronto |
 | Mac com chip M1/M2/M3/M4 | `Ferramenta-NPD-Mac-Apple-Silicon.dmg` | abre e arrasta para Aplicativos |
 
-Os dois saem do GitHub Actions a cada push para `main` (workflows *Aplicativo
-Windows* e *Aplicativo Mac*), em **Actions → a execução → Artifacts**.
+### Publicar uma versão
+
+Os pacotes saem do GitHub Actions a cada push para `main`, mas o que aparece em
+*Artifacts* expira em 90 dias e baixa embrulhado num zip a mais — não é lugar
+de mandar alguém instalar de lá. O lugar é a **release**, e ela se publica
+etiquetando:
+
+```bash
+# 1. mexa na versão em src/npd_tool/__init__.py, e só nela
+# 2. commit
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+A etiqueta dispara as quatro montagens, e cada uma anexa o seu pacote na
+release `v0.2.0` — o `.dmg`, o instalador de Windows e os dois zips de
+terminal. Só a etiqueta faz isso; push comum de `main` continua produzindo
+apenas artifacts.
+
+O número da versão mora em `src/npd_tool/__init__.py` e em nenhum outro lugar:
+o `pyproject.toml`, o `.app` do Mac e o instalador de Windows leem de lá.
 
 Para montar na mão, na máquina do sistema alvo:
 

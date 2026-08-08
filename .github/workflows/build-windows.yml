@@ -10,7 +10,18 @@ name: Executável Windows
 on:
   push:
     branches: [main]
+    # Etiquetar uma versão publica o pacote na release — é o que dá um endereço
+    # fixo para baixar, em vez do artifact do Actions, que expira em 90 dias,
+    # baixa embrulhado num zip a mais e não aparece para quem só procura onde
+    # está o programa.
+    #
+    #     git tag v0.2.0 && git push origin v0.2.0
+    tags: ["v*"]
   workflow_dispatch: # permite rodar na mão, pelo botão do GitHub
+
+# `gh release upload` escreve no repositório; o token padrão do Actions só lê.
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -86,8 +97,32 @@ jobs:
           Set-Content -Path "$pasta\cotacoes\coloque aqui os arquivos de cotacao.txt" `
             -Value "Copie para esta pasta os arquivos de cotacao (.xlsx ou .pdf) e depois clique em '1 - Abrir cotacoes'."
 
+      # Compactar aqui, e não deixar o upload-artifact fazer isso, é o que
+      # permite anexar UM arquivo na release. O artifact do Actions embrulha a
+      # pasta num zip próprio, que só existe do lado de lá.
+      - name: Compactar a pasta de entrega
+        shell: pwsh
+        run: Compress-Archive -Path "Ferramenta NPD" -DestinationPath "Ferramenta-NPD-Windows.zip" -Force
+
       - uses: actions/upload-artifact@v4
         with:
           name: Ferramenta-NPD-Windows
-          path: Ferramenta NPD/
+          path: Ferramenta-NPD-Windows.zip
           if-no-files-found: error
+
+      # Só em etiqueta. Num push comum de `main` não há release para anexar, e
+      # falhar aqui derrubaria uma montagem que deu certo.
+      - name: Publicar na release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # As quatro montagens correm juntas e qualquer uma pode chegar
+          # primeiro. `create` falha para as outras três porque a release já
+          # existe — e é exatamente isso que se quer, então o erro é engolido.
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes "Pacotes prontos abaixo. Windows: Instalar-Ferramenta-NPD.exe. Mac com chip M: Ferramenta-NPD-Mac-Apple-Silicon.dmg. Os arquivos Ferramenta-NPD-* são a versão de terminal." \
+            --verify-tag || true
+          gh release upload "${{ github.ref_name }}" "Ferramenta-NPD-Windows.zip" --clobber

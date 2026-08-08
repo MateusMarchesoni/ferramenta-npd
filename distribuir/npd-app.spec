@@ -10,12 +10,22 @@
 # terminal continua existindo, continua sendo o que a suíte exercita, e não
 # deve engordar com pyobjc nem com WebView2 por causa de uma tela que ele não
 # tem. Dois produtos, duas receitas.
+import re
 import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
 
 RAIZ = Path(SPECPATH).parent  # noqa: F821 — SPECPATH é injetado pelo PyInstaller
+
+# A versão vem do código, lida como texto: importar `npd_tool` aqui obrigaria o
+# pacote a estar instalado no Python que roda o PyInstaller. Escrever o número
+# à mão neste arquivo criaria uma segunda fonte para ele, e a segunda é sempre
+# a que fica para trás.
+VERSAO = re.search(
+    r'__version__ = "([^"]+)"',
+    (RAIZ / "src" / "npd_tool" / "__init__.py").read_text(encoding="utf-8"),
+).group(1)
 
 # O pdfplumber carrega parte do pdfminer por nome, em tempo de execução; sem
 # isto o programa monta, roda com xlsx e só quebra no primeiro PDF — que é o
@@ -87,8 +97,8 @@ if sys.platform == "darwin":
         info_plist={
             "CFBundleName": NOME,
             "CFBundleDisplayName": NOME,
-            "CFBundleShortVersionString": "0.1.0",
-            "CFBundleVersion": "0.1.0",
+            "CFBundleShortVersionString": VERSAO,
+            "CFBundleVersion": VERSAO,
             "NSHumanReadableCopyright": "Marchesoni",
             # sem isto a janela abre em resolução dobrada e borrada nas telas
             # Retina — o defeito mais visível que um app de Mac pode ter

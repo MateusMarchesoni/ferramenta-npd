@@ -38,7 +38,9 @@ DisableDirPage=auto
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\..\dist-instalador
-OutputBaseFilename=Instalar {#Nome}
+; Sem espaço no nome: o GitHub troca espaço por ponto ao anexar o arquivo na
+; release, e "Instalar.Ferramenta.NPD.exe" chega parecendo arquivo corrompido.
+OutputBaseFilename=Instalar-Ferramenta-NPD
 SetupIconFile=..\icone\icone.ico
 UninstallDisplayIcon={app}\{#Nome}.exe
 Compression=lzma2/max
